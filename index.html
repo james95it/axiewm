@@ -2,7 +2,32 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard Ví Ronin - Đa Ví & Giá USD</title>
+    <title>Dashboard Ví Ronin - Firebase Sync</title>
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, get, set, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // --- BƯỚC 1: DÁN CẤU HÌNH CỦA BẠN VÀO ĐÂY ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyCNjLE_yB23EskB006CkJwaAiUsv56Dsbg",
+  authDomain: "axiewm.firebaseapp.com",
+  projectId: "axiewm",
+  storageBucket: "axiewm.firebasestorage.app",
+  messagingSenderId: "952539590502",
+  appId: "1:952539590502:web:a53b0027a1a0fc0a6162a7",
+  measurementId: "G-FMDXXJ6XTZ"
+};
+        // ---------------------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        window.db = db;
+        window.ref = ref;
+        window.get = get;
+        window.set = set;
+        window.child = child;
+    </script>
     <style>
         :root { --primary-color: #1273e6; --bg-color: #f4f6f9; --card-bg: #ffffff; --text-color: #212529; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
@@ -19,6 +44,7 @@
         th { background: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: left; }
         td { padding: 12px; border-bottom: 1px solid #dee2e6; }
         .usd-highlight { color: #28a745; font-weight: bold; }
+        .delta { font-size: 0.9em; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -26,7 +52,7 @@
 <div class="container">
     <h1>Hệ Thống Quản Lý Ví Ronin</h1>
     <div class="refresh-area">
-        <button class="btn-refresh" onclick="main()">🔄 Tải Lại Tất Cả Ví</button>
+        <button class="btn-refresh" onclick="main()">🔄 Tải Lại & So Sánh Firebase</button>
         <p id="msg" style="color: #666; font-size: 14px; margin-top:10px;"></p>
     </div>
 
@@ -40,14 +66,13 @@
 
     <div class="details-section">
         <table>
-            <thead><tr><th>Tên Ví</th><th>Chi Tiết Số Dư</th><th>Giá Trị</th></tr></thead>
+            <thead><tr><th>Tên Ví</th><th>Chi Tiết Số Dư</th><th>Giá Trị</th><th>So với T4</th></tr></thead>
             <tbody id="tbody"></tbody>
         </table>
     </div>
 </div>
 
 <script>
-    // --- CẤU HÌNH VÍ CỦA BẠN TẠI ĐÂY ---
     const WALLETS = [
         { name: "Cody", address: "0x9b3bc1c03e5a8889e893e54950a7c31c11301b79" },
         { name: "Crystie", address: "0xe9add5b325d2b7f869b3a3c7b1047600a76192f7" },
@@ -60,13 +85,21 @@
 	{ name: "Randy", address: "0x7ca6b3a5d9ec0ba2ba00298aa67b768d9bbf7e01" },
 	{ name: "Shiro", address: "0x641146919c8c720cc9f556cbb4f7f5e9d3e2dd73" },
     ];
-
+	
     const RPC = "https://api.roninchain.com/rpc";
     const ADDRS = {
         AXS: "0x97a9107c1793bc407d6f527b77e7fff4d812bece",
         SLP: "0xa8754b9fa15fc18bb59458815510e40a12cd2014",
         WETH: "0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5"
     };
+
+    function getWedDate() {
+        const d = new Date();
+        const day = d.getDay();
+        const diff = (day >= 3) ? (day - 3) : (day + 7 - 3);
+        d.setDate(d.getDate() - diff);
+        return d.toISOString().split('T')[0];
+    }
 
     async function getPrices() {
         try {
@@ -88,11 +121,16 @@
     }
 
     async function main() {
-        document.getElementById('msg').innerText = "Đang quét ví...";
+        if (!window.db) { alert("Chưa cấu hình Firebase!"); return; }
+        document.getElementById('msg').innerText = "Đang quét Firebase...";
         const p = await getPrices();
         const tbody = document.getElementById('tbody');
         tbody.innerHTML = "";
         
+        const wedDate = getWedDate();
+        const snapshotRef = window.ref(window.db, 'snapshots/' + wedDate);
+        const snapshotData = (await window.get(snapshotRef)).val() || {};
+
         let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0;
 
         for (let w of WALLETS) {
@@ -102,11 +140,21 @@
             const slp = await getBal(ADDRS.SLP, w.address);
             const weth = await getBal(ADDRS.WETH, w.address);
 
-            // Tính USD dựa trên giá thực tế
             const val = (ron * (p.ronin?.usd || 0)) + 
                         (axs * (p['axie-infinity']?.usd || 0)) + 
                         (slp * (p['smooth-love-potion']?.usd || 0)) + 
                         (weth * (p.weth?.usd || 0));
+
+            // Nếu chưa có mốc T4, lưu mốc mới
+            if (snapshotData[w.address] === undefined) {
+                snapshotData[w.address] = val;
+                await window.set(window.child(snapshotRef, w.address), val);
+            }
+
+            const oldVal = snapshotData[w.address];
+            const delta = val - oldVal;
+            const deltaClass = delta >= 0 ? "style='color:green'" : "style='color:red'";
+            const deltaText = delta >= 0 ? `+${delta.toFixed(2)}` : `${delta.toFixed(2)}`;
 
             tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val;
 
@@ -114,6 +162,7 @@
                 <td><strong>${w.name}</strong></td>
                 <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
                 <td class="usd-highlight">$${val.toFixed(2)}</td>
+                <td class="delta" ${deltaClass}>${deltaText}</td>
             </tr>`;
         }
 
@@ -122,7 +171,7 @@
         document.getElementById('tot-slp').innerText = tSlp.toFixed(2);
         document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
         document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
-        document.getElementById('msg').innerText = "Cập nhật thành công.";
+        document.getElementById('msg').innerText = "Đã đồng bộ với Firebase. Mốc: " + wedDate;
     }
 </script>
 </body>
