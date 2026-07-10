@@ -2,31 +2,52 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard Ví Ronin - Kiểm tra giá</title>
+    <title>Dashboard Ví Ronin - Đa Ví & Giá USD</title>
     <style>
-        body { font-family: sans-serif; background: #f4f6f9; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
-        .token-row { font-weight: bold; }
-        .val-col { color: #28a745; font-weight: bold; }
+        :root { --primary-color: #1273e6; --bg-color: #f4f6f9; --card-bg: #ffffff; --text-color: #212529; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: #0c356a; margin-bottom: 20px; }
+        .refresh-area { text-align: center; margin-bottom: 25px; }
+        .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .summary-dashboard { background: linear-gradient(135deg, #0f4c81, #1d70b8); color: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
+        .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; }
+        .token-box .name { font-size: 13px; opacity: 0.8; }
+        .token-box .amount { font-size: 18px; font-weight: bold; margin-top: 5px; }
+        .details-section { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+        .usd-highlight { color: #28a745; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Kiểm tra số dư & Giá trị ví</h1>
-    <button onclick="main()" style="padding:10px 20px;">🔄 Tải lại dữ liệu (Debug)</button>
-    <p id="status"></p>
-    
-    <table id="tbl">
-        <thead><tr><th>Token</th><th>Số lượng</th><th>Giá ($)</th><th>Giá trị ($)</th></tr></thead>
-        <tbody id="tbody"></tbody>
-    </table>
-    <h2 id="total-final">Tổng: $0.00</h2>
+    <h1>Hệ Thống Quản Lý Ví Ronin</h1>
+    <div class="refresh-area">
+        <button class="btn-refresh" onclick="main()">🔄 Tải Lại Tất Cả Ví</button>
+        <p id="msg" style="color: #666; font-size: 14px; margin-top:10px;"></p>
+    </div>
+
+    <div class="summary-dashboard">
+        <div class="token-box"><div class="name">Tổng RON</div><div id="tot-ron" class="amount">0</div></div>
+        <div class="token-box"><div class="name">Tổng AXS</div><div id="tot-axs" class="amount">0</div></div>
+        <div class="token-box"><div class="name">Tổng SLP</div><div id="tot-slp" class="amount">0</div></div>
+        <div class="token-box"><div class="name">Tổng WETH</div><div id="tot-weth" class="amount">0</div></div>
+        <div class="token-box" style="border-left: 4px solid #28a745;"><div class="name">Tổng USD</div><div id="tot-usd" class="amount">$ 0</div></div>
+    </div>
+
+    <div class="details-section">
+        <table>
+            <thead><tr><th>Tên Ví</th><th>Chi Tiết Số Dư</th><th>Giá Trị</th></tr></thead>
+            <tbody id="tbody"></tbody>
+        </table>
+    </div>
 </div>
 
 <script>
+    // --- CẤU HÌNH VÍ CỦA BẠN TẠI ĐÂY ---
     const WALLETS = [
         { name: "Cody", address: "0x9b3bc1c03e5a8889e893e54950a7c31c11301b79" },
         { name: "Crystie", address: "0xe9add5b325d2b7f869b3a3c7b1047600a76192f7" },
@@ -47,18 +68,17 @@
         WETH: "0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5"
     };
 
-    // Hàm lấy giá, dùng ID 'weth' thay vì 'wrapped-ether' cho chuẩn xác
     async function getPrices() {
         try {
-            const url = "https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd";
-            const res = await fetch(url);
+            const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
             return await res.json();
         } catch(e) { return {}; }
     }
 
     async function call(m, p) {
         const r = await fetch(RPC, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:"2.0", id:1, method:m, params:p})});
-        return (await r.json()).result;
+        const d = await r.json();
+        return d.result;
     }
 
     async function getBal(t, u) {
@@ -68,47 +88,41 @@
     }
 
     async function main() {
-        document.getElementById('status').innerText = "Đang tải dữ liệu...";
+        document.getElementById('msg').innerText = "Đang quét ví...";
         const p = await getPrices();
         const tbody = document.getElementById('tbody');
         tbody.innerHTML = "";
         
-        // Lấy dữ liệu cho ví Cody
-        const w = WALLETS[0];
-        const ronHex = await call("eth_getBalance", [w.address, "latest"]);
-        const rBal = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
-        const aBal = await getBal(ADDRS.AXS, w.address);
-        const sBal = await getBal(ADDRS.SLP, w.address);
-        const wBal = await getBal(ADDRS.WETH, w.address);
+        let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0;
 
-        // Giá từ API
-        const pRon = p.ronin?.usd || 0;
-        const pAxs = p['axie-infinity']?.usd || 0;
-        const pSlp = p['smooth-love-potion']?.usd || 0;
-        const pWeth = p.weth?.usd || 0;
+        for (let w of WALLETS) {
+            const ronHex = await call("eth_getBalance", [w.address, "latest"]);
+            const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
+            const axs = await getBal(ADDRS.AXS, w.address);
+            const slp = await getBal(ADDRS.SLP, w.address);
+            const weth = await getBal(ADDRS.WETH, w.address);
 
-        // Tính toán
-        const data = [
-            { name: "RON", qty: rBal, price: pRon },
-            { name: "AXS", qty: aBal, price: pAxs },
-            { name: "SLP", qty: sBal, price: pSlp },
-            { name: "WETH", qty: wBal, price: pWeth }
-        ];
+            // Tính USD dựa trên giá thực tế
+            const val = (ron * (p.ronin?.usd || 0)) + 
+                        (axs * (p['axie-infinity']?.usd || 0)) + 
+                        (slp * (p['smooth-love-potion']?.usd || 0)) + 
+                        (weth * (p.weth?.usd || 0));
 
-        let total = 0;
-        data.forEach(item => {
-            const val = item.qty * item.price;
-            total += val;
+            tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val;
+
             tbody.innerHTML += `<tr>
-                <td class="token-row">${item.name}</td>
-                <td>${item.qty.toFixed(4)}</td>
-                <td>$${item.price.toFixed(2)}</td>
-                <td class="val-col">$${val.toFixed(2)}</td>
+                <td><strong>${w.name}</strong></td>
+                <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
+                <td class="usd-highlight">$${val.toFixed(2)}</td>
             </tr>`;
-        });
+        }
 
-        document.getElementById('total-final').innerText = "Tổng ví: $" + total.toFixed(2);
-        document.getElementById('status').innerText = "Đã cập nhật xong.";
+        document.getElementById('tot-ron').innerText = tRon.toFixed(2);
+        document.getElementById('tot-axs').innerText = tAxs.toFixed(2);
+        document.getElementById('tot-slp').innerText = tSlp.toFixed(2);
+        document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
+        document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
+        document.getElementById('msg').innerText = "Cập nhật thành công.";
     }
 </script>
 </body>
