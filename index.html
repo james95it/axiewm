@@ -11,9 +11,15 @@
         .refresh-area { text-align: center; margin-bottom: 25px; }
         .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
         .summary-dashboard { background: linear-gradient(135deg, #0f4c81, #1d70b8); color: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
-        .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; }
+        .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; position: relative; }
         .token-box .name { font-size: 13px; opacity: 0.8; }
         .token-box .amount { font-size: 18px; font-weight: bold; margin-top: 5px; }
+        
+        /* CSS cho phần hiển thị tổng chênh lệch */
+        #tot-usd-delta { font-size: 13px; font-weight: bold; margin-top: 8px; display: inline-block; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.15); }
+        .delta-up { color: #4ade80; } /* Xanh lá sáng cho nền tối */
+        .delta-down { color: #f87171; } /* Đỏ sáng cho nền tối */
+
         .details-section { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: left; }
@@ -36,7 +42,12 @@
         <div class="token-box"><div class="name">Tổng AXS</div><div id="tot-axs" class="amount">0</div></div>
         <div class="token-box"><div class="name">Tổng SLP</div><div id="tot-slp" class="amount">0</div></div>
         <div class="token-box"><div class="name">Tổng WETH</div><div id="tot-weth" class="amount">0</div></div>
-        <div class="token-box" style="border-left: 4px solid #28a745;"><div class="name">Tổng USD</div><div id="tot-usd" class="amount">$ 0</div></div>
+        <div class="token-box" style="border-left: 4px solid #28a745;">
+            <div class="name">Tổng USD</div>
+            <div id="tot-usd" class="amount">$ 0</div>
+            <!-- Chỗ hiển thị biến động tổng -->
+            <div id="tot-usd-delta"></div>
+        </div>
     </div>
 
     <div class="details-section">
@@ -51,8 +62,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, get, set, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // --- CẤU HÌNH 10 VÍ CỦA BẠN TẠI ĐY ---
-   const WALLETS = [
+    // --- CẤU HÌNH VÍ CỦA BẠN ---
+    const WALLETS = [
         { name: "Cody", address: "0x9b3bc1c03e5a8889e893e54950a7c31c11301b79" },
         { name: "Crystie", address: "0xe9add5b325d2b7f869b3a3c7b1047600a76192f7" },
         { name: "James1", address: "0x39fac7a74365c188c293bd9a064323b50e63cde7" },
@@ -87,7 +98,6 @@
         WETH: "0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5"
     };
 
-    // Khóa trạng thái chống quét trùng lặp
     let isScanning = false; 
 
     function getWedDate() {
@@ -120,12 +130,14 @@
     }
 
     async function main() {
-        // Nếu đang quét rồi thì chặn không cho chạy đè lên nhau
         if (isScanning) return; 
         isScanning = true;
 
         const msgEl = document.getElementById('msg');
+        const totalDeltaEl = document.getElementById('tot-usd-delta');
         msgEl.innerText = "Đang kết nối dữ liệu mạng...";
+        totalDeltaEl.innerText = "⏳...";
+        totalDeltaEl.className = "";
         
         const p = await getPrices();
         const tbody = document.getElementById('tbody');
@@ -137,19 +149,17 @@
         let isFirebaseOk = false;
 
         try {
-            if (firebaseConfig.apiKey.includes("AIzaSy...")) {
-                throw new Error("Bạn chưa cấu hình thông tin Firebase thật.");
-            }
+            if (firebaseConfig.apiKey.includes("AIzaSy...")) throw new Error("Chưa có API Key thật.");
             const dbSnapshot = await get(snapshotRef);
             snapshotData = dbSnapshot.val() || {};
             isFirebaseOk = true;
         } catch (error) {
-            console.warn("Firebase bypass:", error.message);
-            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Không đồng bộ được Firebase: ${error.message} (Chạy Offline)</span>`;
+            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Chạy Offline: ${error.message}</span>`;
+            totalDeltaEl.style.display = "none";
         }
 
-        let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0;
-        let rowsHtml = ""; // Biến tạm tích lũy chuỗi HTML
+        let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0, tUsdDelta = 0;
+        let rowsHtml = "";
 
         for (let w of WALLETS) {
             const ronHex = await call("eth_getBalance", [w.address, "latest"]);
@@ -167,7 +177,7 @@
                 try {
                     snapshotData[w.address] = val;
                     await set(child(snapshotRef, w.address), val);
-                } catch(e) { console.error("Lỗi ghi dữ liệu:", e); }
+                } catch(e) {}
             }
 
             const oldVal = snapshotData[w.address] !== undefined ? snapshotData[w.address] : val;
@@ -175,9 +185,9 @@
             const deltaClass = delta >= 0 ? "style='color:green'" : "style='color:red'";
             const deltaText = delta >= 0 ? `+${delta.toFixed(2)}` : `${delta.toFixed(2)}`;
 
-            tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val;
+            tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val; 
+            tUsdDelta += delta; // Cộng dồn chênh lệch để tính Tổng Biến Động
 
-            // Cộng dồn vào chuỗi tạm thay vì render trực tiếp vào DOM luôn
             rowsHtml += `<tr>
                 <td><strong>${w.name}</strong></td>
                 <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
@@ -186,7 +196,6 @@
             </tr>`;
         }
 
-        // Sau khi xong toàn bộ vòng lặp, ghi đè 1 lần duy nhất để làm sạch bảng
         tbody.innerHTML = rowsHtml; 
 
         document.getElementById('tot-ron').innerText = tRon.toFixed(2);
@@ -195,11 +204,21 @@
         document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
         document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
         
+        // Cập nhật giao diện Tổng Biến Động (Chỉ khi Firebase hoạt động)
         if (isFirebaseOk) {
             msgEl.innerText = "Đã đồng bộ thành công. Mốc so sánh Thứ 4 (" + wedDate + ")";
+            totalDeltaEl.style.display = "inline-block";
+            if (tUsdDelta >= 0) {
+                totalDeltaEl.innerText = `▲ +$${tUsdDelta.toFixed(2)}`;
+                totalDeltaEl.className = "delta-up";
+            } else {
+                // Dùng Math.abs để loại bỏ dấu trừ trong chuỗi, ví dụ thành ▼ -$50 thay vì ▼ $-50
+                totalDeltaEl.innerText = `▼ -$${Math.abs(tUsdDelta).toFixed(2)}`;
+                totalDeltaEl.className = "delta-down";
+            }
         }
 
-        isScanning = false; // Mở khóa sau khi hoàn tất xử lý dữ liệu
+        isScanning = false;
     }
 
     document.getElementById('btn-refresh').addEventListener('click', main);
