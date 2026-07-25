@@ -9,16 +9,16 @@
         .container { max-width: 1200px; margin: 0 auto; }
         h1 { text-align: center; color: #0c356a; margin-bottom: 20px; }
         .refresh-area { text-align: center; margin-bottom: 25px; }
-        .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; }
+        .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
         .summary-dashboard { background: linear-gradient(135deg, #0f4c81, #1d70b8); color: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
         .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; position: relative; }
         .token-box .name { font-size: 13px; opacity: 0.8; }
         .token-box .amount { font-size: 18px; font-weight: bold; margin-top: 5px; }
         
-        /* CSS cho phần hiển thị tổng chênh lệch */
         #tot-usd-delta { font-size: 13px; font-weight: bold; margin-top: 8px; display: inline-block; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.15); }
-        .delta-up { color: #4ade80; } /* Xanh lá sáng cho nền tối */
-        .delta-down { color: #f87171; } /* Đỏ sáng cho nền tối */
+        .delta-up { color: #4ade80; }
+        .delta-down { color: #f87171; }
 
         .details-section { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
@@ -45,7 +45,6 @@
         <div class="token-box" style="border-left: 4px solid #28a745;">
             <div class="name">Tổng USD</div>
             <div id="tot-usd" class="amount">$ 0</div>
-            <!-- Chỗ hiển thị biến động tổng -->
             <div id="tot-usd-delta"></div>
         </div>
     </div>
@@ -62,32 +61,30 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, get, set, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // --- CẤU HÌNH VÍ CỦA BẠN ---
     const WALLETS = [
         { name: "Cody", address: "0xB560DE556Cf8724aa479121139B8e7EE1Dc8447F" },
         { name: "Crystie", address: "0x5B842258fC785E3C8b5d17a150FB8a9Fdce26593" },
         { name: "James1", address: "0x39fac7a74365c188c293bd9a064323b50e63cde7" },
-	{ name: "Kuro", address: "0x20d9cb64a6c5cf875897a54cf171df930d612abb" },
-	{ name: "Loki", address: "0xd985f56b366d1ea58a240b06c34a97919af168f5" },
-	{ name: "Momo", address: "0xB512f72D97a826AbB80c2258De350A9a37256BB7" },
-	{ name: "Omi", address: "0x92b626df33ba8bf0d3abd7297e48e5e48e1be030" },
-	{ name: "Pokemon", address: "0xcee118fb6b827a5ce2eb61cca321e516fdccafdb" },
-	{ name: "Randy", address: "0x7ca6b3a5d9ec0ba2ba00298aa67b768d9bbf7e01" },
-	{ name: "Shiro", address: "0x641146919c8c720cc9f556cbb4f7f5e9d3e2dd73" },
-		{ name: "Nezuko", address: "0x3E57FcF62E7655770cA45bc3Aabf5344d9560c65" },
+        { name: "Kuro", address: "0x20d9cb64a6c5cf875897a54cf171df930d612abb" },
+        { name: "Loki", address: "0xd985f56b366d1ea58a240b06c34a97919af168f5" },
+        { name: "Momo", address: "0xB512f72D97a826AbB80c2258De350A9a37256BB7" },
+        { name: "Omi", address: "0x92b626df33ba8bf0d3abd7297e48e5e48e1be030" },
+        { name: "Pokemon", address: "0xcee118fb6b827a5ce2eb61cca321e516fdccafdb" },
+        { name: "Randy", address: "0x7ca6b3a5d9ec0ba2ba00298aa67b768d9bbf7e01" },
+        { name: "Shiro", address: "0x641146919c8c720cc9f556cbb4f7f5e9d3e2dd73" },
+        { name: "Nezuko", address: "0x3E57FcF62E7655770cA45bc3Aabf5344d9560c65" },
     ];
 
-    // --- CẤU HÌNH FIREBASE CỦA BẠN ---
     const firebaseConfig = {
-  apiKey: "AIzaSyCNjLE_yB23EskB006CkJwaAiUsv56Dsbg",
-  authDomain: "axiewm.firebaseapp.com",
-  databaseURL: "https://axiewm-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "axiewm",
-  storageBucket: "axiewm.firebasestorage.app",
-  messagingSenderId: "952539590502",
-  appId: "1:952539590502:web:a53b0027a1a0fc0a6162a7",
-  measurementId: "G-FMDXXJ6XTZ"
-};
+        apiKey: "AIzaSyCNjLE_yB23EskB006CkJwaAiUsv56Dsbg",
+        authDomain: "axiewm.firebaseapp.com",
+        databaseURL: "https://axiewm-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "axiewm",
+        storageBucket: "axiewm.firebasestorage.app",
+        messagingSenderId: "952539590502",
+        appId: "1:952539590502:web:a53b0027a1a0fc0a6162a7",
+        measurementId: "G-FMDXXJ6XTZ"
+    };
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
@@ -101,24 +98,37 @@
 
     let isScanning = false; 
 
+    // Lấy ngày Thứ 4 gần nhất theo múi giờ địa phương (Tránh lỗi UTC)
     function getWedDate() {
         const d = new Date();
         const day = d.getDay();
         const diff = (day >= 3) ? (day - 3) : (day + 7 - 3);
         d.setDate(d.getDate() - diff);
-        return d.toISOString().split('T')[0];
+        
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
     }
 
     async function getPrices() {
         try {
             const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
+            if (!res.ok) throw new Error("CoinGecko Rate Limit");
             return await res.json();
-        } catch(e) { return {}; }
+        } catch(e) { 
+            console.warn("Không lấy được giá thị trường:", e.message);
+            return {}; 
+        }
     }
 
     async function call(m, p) {
         try {
-            const r = await fetch(RPC, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:"2.0", id:1, method:m, params:p})});
+            const r = await fetch(RPC, {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body: JSON.stringify({jsonrpc:"2.0", id:1, method:m, params:p})
+            });
             const d = await r.json();
             return d.result;
         } catch(e) { return null; }
@@ -130,82 +140,95 @@
         return (!h || h === "0x") ? 0 : Number(BigInt(h)) / 1e18;
     }
 
+    // Tải dữ liệu của 1 ví (Lấy cả 4 token cùng lúc)
+    async function fetchWalletBalances(w) {
+        const [ronHex, axs, slp, weth] = await Promise.all([
+            call("eth_getBalance", [w.address, "latest"]),
+            getBal(ADDRS.AXS, w.address),
+            getBal(ADDRS.SLP, w.address),
+            getBal(ADDRS.WETH, w.address)
+        ]);
+
+        const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
+        return { wallet: w, ron, axs, slp, weth };
+    }
+
     async function main() {
         if (isScanning) return; 
         isScanning = true;
 
+        const btnEl = document.getElementById('btn-refresh');
         const msgEl = document.getElementById('msg');
         const totalDeltaEl = document.getElementById('tot-usd-delta');
-        msgEl.innerText = "Đang kết nối dữ liệu mạng...";
+
+        btnEl.disabled = true;
+        msgEl.innerText = "⏳ Đang tải số dư song song...";
         totalDeltaEl.innerText = "⏳...";
         totalDeltaEl.className = "";
-        
-        const p = await getPrices();
-        const tbody = document.getElementById('tbody');
-        
+
         const wedDate = getWedDate();
         const snapshotRef = ref(db, 'snapshots/' + wedDate);
-        
-        let snapshotData = {};
-        let isFirebaseOk = false;
 
-        try {
-            if (firebaseConfig.apiKey.includes("AIzaSy...")) throw new Error("Chưa có API Key thật.");
-            const dbSnapshot = await get(snapshotRef);
-            snapshotData = dbSnapshot.val() || {};
-            isFirebaseOk = true;
-        } catch (error) {
-            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Chạy Offline: ${error.message}</span>`;
+        // Chạy song song: Tải giá CoinGecko + Lấy dữ liệu Firebase + Tải số dư tất cả các ví
+        const [p, dbSnapshotResults, walletsData] = await Promise.all([
+            getPrices(),
+            get(snapshotRef).catch(err => ({ error: err })),
+            Promise.all(WALLETS.map(w => fetchWalletBalances(w)))
+        ]);
+
+        let snapshotData = {};
+        let isFirebaseOk = true;
+
+        if (dbSnapshotResults && dbSnapshotResults.error) {
+            isFirebaseOk = false;
+            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Firebase Offline: ${dbSnapshotResults.error.message}</span>`;
             totalDeltaEl.style.display = "none";
+        } else if (dbSnapshotResults) {
+            snapshotData = dbSnapshotResults.val() || {};
         }
 
         let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0, tUsdDelta = 0;
         let rowsHtml = "";
 
-        for (let w of WALLETS) {
-            const ronHex = await call("eth_getBalance", [w.address, "latest"]);
-            const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
-            const axs = await getBal(ADDRS.AXS, w.address);
-            const slp = await getBal(ADDRS.SLP, w.address);
-            const weth = await getBal(ADDRS.WETH, w.address);
+        for (let item of walletsData) {
+            const { wallet, ron, axs, slp, weth } = item;
 
             const val = (ron * (p.ronin?.usd || 0)) + 
                         (axs * (p['axie-infinity']?.usd || 0)) + 
                         (slp * (p['smooth-love-potion']?.usd || 0)) + 
                         (weth * (p.weth?.usd || 0));
 
-            if (isFirebaseOk && snapshotData[w.address] === undefined) {
+            if (isFirebaseOk && snapshotData[wallet.address] === undefined) {
                 try {
-                    snapshotData[w.address] = val;
-                    await set(child(snapshotRef, w.address), val);
+                    snapshotData[wallet.address] = val;
+                    await set(child(snapshotRef, wallet.address), val);
                 } catch(e) {}
             }
 
-            const oldVal = snapshotData[w.address] !== undefined ? snapshotData[w.address] : val;
+            const oldVal = snapshotData[wallet.address] !== undefined ? snapshotData[wallet.address] : val;
             const delta = val - oldVal;
             const deltaClass = delta >= 0 ? "style='color:green'" : "style='color:red'";
             const deltaText = delta >= 0 ? `+${delta.toFixed(2)}` : `${delta.toFixed(2)}`;
 
             tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val; 
-            tUsdDelta += delta; // Cộng dồn chênh lệch để tính Tổng Biến Động
+            tUsdDelta += delta;
 
             rowsHtml += `<tr>
-                <td><strong>${w.name}</strong></td>
+                <td><strong>${wallet.name}</strong></td>
                 <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
                 <td class="usd-highlight">$${val.toFixed(2)}</td>
                 <td class="delta" ${deltaClass}>${isFirebaseOk ? deltaText : 'N/A'}</td>
             </tr>`;
         }
 
-        tbody.innerHTML = rowsHtml; 
+        document.getElementById('tbody').innerHTML = rowsHtml; 
 
         document.getElementById('tot-ron').innerText = tRon.toFixed(2);
         document.getElementById('tot-axs').innerText = tAxs.toFixed(2);
         document.getElementById('tot-slp').innerText = tSlp.toFixed(2);
         document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
         document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
-        
-        // Cập nhật giao diện Tổng Biến Động (Chỉ khi Firebase hoạt động)
+
         if (isFirebaseOk) {
             msgEl.innerText = "Đã đồng bộ thành công. Mốc so sánh Thứ 4 (" + wedDate + ")";
             totalDeltaEl.style.display = "inline-block";
@@ -213,12 +236,12 @@
                 totalDeltaEl.innerText = `▲ +$${tUsdDelta.toFixed(2)}`;
                 totalDeltaEl.className = "delta-up";
             } else {
-                // Dùng Math.abs để loại bỏ dấu trừ trong chuỗi, ví dụ thành ▼ -$50 thay vì ▼ $-50
                 totalDeltaEl.innerText = `▼ -$${Math.abs(tUsdDelta).toFixed(2)}`;
                 totalDeltaEl.className = "delta-down";
             }
         }
 
+        btnEl.disabled = false;
         isScanning = false;
     }
 
