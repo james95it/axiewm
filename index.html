@@ -26,11 +26,47 @@
         td { padding: 12px; border-bottom: 1px solid #dee2e6; }
         .usd-highlight { color: #28a745; font-weight: bold; }
         .delta { font-size: 0.9em; font-weight: bold; }
+
+        /* Giao diện màn hình đăng nhập */
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: var(--bg-color);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999;
+        }
+        .login-card {
+            background: var(--card-bg); padding: 30px; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 360px; width: 90%;
+        }
+        .login-card h2 { margin-top: 0; color: #0c356a; font-size: 20px; }
+        .login-card input {
+            width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc;
+            border-radius: 6px; box-sizing: border-box; font-size: 16px; outline: none;
+        }
+        .login-card input:focus { border-color: var(--primary-color); }
+        .login-card button {
+            width: 100%; background: var(--primary-color); color: white; border: none;
+            padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+        .login-card button:hover { opacity: 0.9; }
+        #login-error { color: #dc3545; font-size: 13px; margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
 
-<div class="container">
+<!-- MÀN HÌNH ĐĂNG NHẬP -->
+<div id="login-screen">
+    <div class="login-card">
+        <h2>🔐 Xác Thực Truy Cập</h2>
+        <p style="font-size: 13px; color: #666; margin-bottom: 0;">Vui lòng nhập mật khẩu để vào Dashboard</p>
+        <input type="password" id="password-input" placeholder="Mật khẩu của bạn..." />
+        <button id="btn-login">Đăng Nhập</button>
+        <p id="login-error"></p>
+    </div>
+</div>
+
+<!-- NỘI DUNG DASHBOARD (MẶC ĐỊNH ẨN) -->
+<div class="container" id="main-dashboard" style="display: none;">
     <h1>Hệ Thống Quản Lý Ví Ronin</h1>
     <div class="refresh-area">
         <button class="btn-refresh" id="btn-refresh">🔄 Tải Lại & So Sánh Firebase</button>
@@ -98,7 +134,76 @@
 
     let isScanning = false; 
 
-    // Lấy ngày Thứ 4 gần nhất theo múi giờ địa phương (Tránh lỗi UTC)
+    // --- XỬ LÝ ĐĂNG NHẬP ---
+    const loginScreen = document.getElementById('login-screen');
+    const mainDashboard = document.getElementById('main-dashboard');
+    const passwordInput = document.getElementById('password-input');
+    const btnLogin = document.getElementById('btn-login');
+    const loginError = document.getElementById('login-error');
+
+    async function handleLogin() {
+        const inputPass = passwordInput.value.trim();
+        if (!inputPass) {
+            showError("Vui lòng nhập mật khẩu!");
+            return;
+        }
+
+        btnLogin.disabled = true;
+        btnLogin.innerText = "⏳ Đang kiểm tra...";
+        loginError.style.display = "none";
+
+        try {
+            // Lấy mật khẩu lưu trên Firebase Realtime Database ở node 'password'
+            const passwordRef = ref(db, 'password');
+            const snapshot = await get(passwordRef);
+
+            if (!snapshot.exists()) {
+                showError("Chưa cài mật khẩu ở node 'password' trên Firebase!");
+                btnLogin.disabled = false;
+                btnLogin.innerText = "Đăng Nhập";
+                return;
+            }
+
+            const dbPassword = String(snapshot.val());
+
+            if (inputPass === dbPassword) {
+                // Mật khẩu đúng
+                sessionStorage.setItem('is_authenticated', 'true');
+                unlockDashboard();
+            } else {
+                showError("Mật khẩu không chính xác!");
+                btnLogin.disabled = false;
+                btnLogin.innerText = "Đăng Nhập";
+            }
+        } catch (err) {
+            showError("Lỗi kết nối Firebase: " + err.message);
+            btnLogin.disabled = false;
+            btnLogin.innerText = "Đăng Nhập";
+        }
+    }
+
+    function showError(msg) {
+        loginError.innerText = msg;
+        loginError.style.display = "block";
+    }
+
+    function unlockDashboard() {
+        loginScreen.style.display = "none";
+        mainDashboard.style.display = "block";
+        main(); // Chạy hàm tải số dư ví
+    }
+
+    // Kiểm tra nếu đã đăng nhập trước đó trong phiên duyệt web này
+    if (sessionStorage.getItem('is_authenticated') === 'true') {
+        unlockDashboard();
+    }
+
+    btnLogin.addEventListener('click', handleLogin);
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    // --- LOGIC TẢI DỮ LIỆU DASHBOARD ---
     function getWedDate() {
         const d = new Date();
         const day = d.getDay();
@@ -140,7 +245,6 @@
         return (!h || h === "0x") ? 0 : Number(BigInt(h)) / 1e18;
     }
 
-    // Tải dữ liệu của 1 ví (Lấy cả 4 token cùng lúc)
     async function fetchWalletBalances(w) {
         const [ronHex, axs, slp, weth] = await Promise.all([
             call("eth_getBalance", [w.address, "latest"]),
@@ -169,7 +273,6 @@
         const wedDate = getWedDate();
         const snapshotRef = ref(db, 'snapshots/' + wedDate);
 
-        // Chạy song song: Tải giá CoinGecko + Lấy dữ liệu Firebase + Tải số dư tất cả các ví
         const [p, dbSnapshotResults, walletsData] = await Promise.all([
             getPrices(),
             get(snapshotRef).catch(err => ({ error: err })),
@@ -246,7 +349,6 @@
     }
 
     document.getElementById('btn-refresh').addEventListener('click', main);
-    main();
 </script>
 </body>
 </html>
