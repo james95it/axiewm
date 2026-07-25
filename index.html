@@ -7,23 +7,18 @@
         :root { --primary-color: #1273e6; --bg-color: #f4f6f9; --card-bg: #ffffff; --text-color: #212529; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .header-bar h1 { margin: 0; color: #0c356a; font-size: 26px; }
-        .btn-logout { background-color: #dc3545; color: white; border: none; padding: 8px 18px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: opacity 0.2s; }
-        .btn-logout:hover { opacity: 0.85; }
-
+        h1 { text-align: center; color: #0c356a; margin-bottom: 20px; }
         .refresh-area { text-align: center; margin-bottom: 25px; }
-        .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: opacity 0.2s; }
-        .btn-refresh:disabled { opacity: 0.6; cursor: not-allowed; }
+        .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
         .summary-dashboard { background: linear-gradient(135deg, #0f4c81, #1d70b8); color: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
         .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; position: relative; }
         .token-box .name { font-size: 13px; opacity: 0.8; }
         .token-box .amount { font-size: 18px; font-weight: bold; margin-top: 5px; }
         
+        /* CSS cho phần hiển thị tổng chênh lệch */
         #tot-usd-delta { font-size: 13px; font-weight: bold; margin-top: 8px; display: inline-block; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.15); }
-        .delta-up { color: #4ade80; }
-        .delta-down { color: #f87171; }
+        .delta-up { color: #4ade80; } /* Xanh lá sáng cho nền tối */
+        .delta-down { color: #f87171; } /* Đỏ sáng cho nền tối */
 
         .details-section { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
@@ -32,7 +27,7 @@
         .usd-highlight { color: #28a745; font-weight: bold; }
         .delta { font-size: 0.9em; font-weight: bold; }
 
-        /* Giao diện màn hình đăng nhập */
+        /* CSS BỔ SUNG: Màn hình đăng nhập & Nút đăng xuất */
         #login-screen {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background-color: var(--bg-color);
@@ -55,6 +50,11 @@
         }
         .login-card button:hover { opacity: 0.9; }
         #login-error { color: #dc3545; font-size: 13px; margin-top: 10px; display: none; }
+        
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-bar h1 { margin: 0; }
+        .btn-logout { background-color: #dc3545; color: white; border: none; padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .btn-logout:hover { opacity: 0.85; }
     </style>
 </head>
 <body>
@@ -70,7 +70,7 @@
     </div>
 </div>
 
-<!-- NỘI DUNG DASHBOARD (MẶC ĐỊNH ẨN) -->
+<!-- CONTAINER DASHBOARD (MẶC ĐỊNH ẨN) -->
 <div class="container" id="main-dashboard" style="display: none;">
     <div class="header-bar">
         <h1>Hệ Thống Quản Lý Ví Ronin</h1>
@@ -90,6 +90,7 @@
         <div class="token-box" style="border-left: 4px solid #28a745;">
             <div class="name">Tổng USD</div>
             <div id="tot-usd" class="amount">$ 0</div>
+            <!-- Chỗ hiển thị biến động tổng -->
             <div id="tot-usd-delta"></div>
         </div>
     </div>
@@ -106,6 +107,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getDatabase, ref, get, set, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
+    // --- CẤU HÌNH VÍ CỦA BẠN ---
     const WALLETS = [
         { name: "Cody", address: "0xB560DE556Cf8724aa479121139B8e7EE1Dc8447F" },
         { name: "Crystie", address: "0x5B842258fC785E3C8b5d17a150FB8a9Fdce26593" },
@@ -120,6 +122,7 @@
         { name: "Nezuko", address: "0x3E57FcF62E7655770cA45bc3Aabf5344d9560c65" },
     ];
 
+    // --- CẤU HÌNH FIREBASE CỦA BẠN ---
     const firebaseConfig = {
         apiKey: "AIzaSyCNjLE_yB23EskB006CkJwaAiUsv56Dsbg",
         authDomain: "axiewm.firebaseapp.com",
@@ -134,12 +137,7 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
 
-    // Danh sách RPC Node (Chính + Dự phòng)
-    const RPCS = [
-        "https://api.roninchain.com/rpc",
-        "https://ronin-mainnet.public.blastapi.io"
-    ];
-
+    const RPC = "https://api.roninchain.com/rpc";
     const ADDRS = {
         AXS: "0x97a9107c1793bc407d6f527b77e7fff4d812bece",
         SLP: "0xa8754b9fa15fc18bb59458815510e40a12cd2014",
@@ -148,7 +146,7 @@
 
     let isScanning = false; 
 
-    // --- XỬ LÝ ĐĂNG NHẬP & ĐĂNG XUẤT ---
+    // --- BỔ SUNG: XỬ LÝ ĐĂNG NHẬP & ĐĂNG XUẤT ---
     const loginScreen = document.getElementById('login-screen');
     const mainDashboard = document.getElementById('main-dashboard');
     const passwordInput = document.getElementById('password-input');
@@ -203,7 +201,7 @@
     function unlockDashboard() {
         loginScreen.style.display = "none";
         mainDashboard.style.display = "block";
-        main();
+        main(); // Gọi hàm main gốc sau khi đăng nhập thành công
     }
 
     function handleLogout() {
@@ -225,159 +223,112 @@
         if (e.key === 'Enter') handleLogin();
     });
 
-    // --- LOGIC TẢI DỮ LIỆU VÍ ---
+    // --- GIỮ NGUYÊN HOÀN TOÀN TẤT CẢ HÀM LOGIC BAN ĐẦU CỦA BẠN ---
     function getWedDate() {
         const d = new Date();
         const day = d.getDay();
         const diff = (day >= 3) ? (day - 3) : (day + 7 - 3);
         d.setDate(d.getDate() - diff);
-        
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
+        return d.toISOString().split('T')[0];
     }
 
     async function getPrices() {
         try {
             const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
-            if (!res.ok) throw new Error("CoinGecko Rate Limit");
             return await res.json();
-        } catch(e) { 
-            console.warn("Không lấy được giá CoinGecko:", e.message);
-            return {}; 
-        }
+        } catch(e) { return {}; }
     }
 
-    // Gọi RPC với cơ chế tự động thử Node dự phòng nếu Node chính lỗi
     async function call(m, p) {
-        for (let rpc of RPCS) {
-            try {
-                const r = await fetch(rpc, {
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: m, params: p })
-                });
-                if (!r.ok) continue;
-                const d = await r.json();
-                if (d && d.result !== undefined) return d.result;
-            } catch(e) {}
-        }
-        return null;
+        try {
+            const r = await fetch(RPC, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:"2.0", id:1, method:m, params:p})});
+            const d = await r.json();
+            return d.result;
+        } catch(e) { return null; }
     }
 
     async function getBal(t, u) {
-        const cleanAddr = u.replace("0x", "").toLowerCase().padStart(64, '0');
-        const d = "0x70a08231" + cleanAddr;
-        const h = await call("eth_call", [{ to: t, data: d }, "latest"]);
+        const d = "0x70a08231" + u.slice(2).padStart(64, '0');
+        const h = await call("eth_call", [{to: t, data: d}, "latest"]);
         return (!h || h === "0x") ? 0 : Number(BigInt(h)) / 1e18;
-    }
-
-    async function fetchWalletBalances(w) {
-        const [ronHex, axs, slp, weth] = await Promise.all([
-            call("eth_getBalance", [w.address, "latest"]),
-            getBal(ADDRS.AXS, w.address),
-            getBal(ADDRS.SLP, w.address),
-            getBal(ADDRS.WETH, w.address)
-        ]);
-
-        const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
-        return { wallet: w, ron, axs, slp, weth };
-    }
-
-    // Tải dữ liệu các ví theo từng nhóm nhỏ (Tránh spam request làm RPC bị chặn)
-    async function fetchAllWalletsBatch(wallets) {
-        const results = [];
-        const chunkSize = 3; // Mỗi lần xử lý 3 ví
-        for (let i = 0; i < wallets.length; i += chunkSize) {
-            const chunk = wallets.slice(i, i + chunkSize);
-            const chunkResults = await Promise.all(chunk.map(w => fetchWalletBalances(w)));
-            results.push(...chunkResults);
-            
-            // Nghỉ 100ms giữa các đợt để tôn trọng giới hạn của RPC
-            if (i + chunkSize < wallets.length) {
-                await new Promise(res => setTimeout(res, 100));
-            }
-        }
-        return results;
     }
 
     async function main() {
         if (isScanning) return; 
         isScanning = true;
 
-        const btnEl = document.getElementById('btn-refresh');
         const msgEl = document.getElementById('msg');
         const totalDeltaEl = document.getElementById('tot-usd-delta');
-
-        btnEl.disabled = true;
-        msgEl.innerText = "⏳ Đang tải số dư an toàn...";
+        msgEl.innerText = "Đang kết nối dữ liệu mạng...";
         totalDeltaEl.innerText = "⏳...";
         totalDeltaEl.className = "";
-
+        
+        const p = await getPrices();
+        const tbody = document.getElementById('tbody');
+        
         const wedDate = getWedDate();
         const snapshotRef = ref(db, 'snapshots/' + wedDate);
-
-        // Chạy song song Lấy giá + Firebase + Lấy số dư ví (Đã chia đợt)
-        const [p, dbSnapshotResults, walletsData] = await Promise.all([
-            getPrices(),
-            get(snapshotRef).catch(err => ({ error: err })),
-            fetchAllWalletsBatch(WALLETS)
-        ]);
-
+        
         let snapshotData = {};
-        let isFirebaseOk = true;
+        let isFirebaseOk = false;
 
-        if (dbSnapshotResults && dbSnapshotResults.error) {
-            isFirebaseOk = false;
-            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Firebase Offline: ${dbSnapshotResults.error.message}</span>`;
+        try {
+            if (firebaseConfig.apiKey.includes("AIzaSy...")) throw new Error("Chưa có API Key thật.");
+            const dbSnapshot = await get(snapshotRef);
+            snapshotData = dbSnapshot.val() || {};
+            isFirebaseOk = true;
+        } catch (error) {
+            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Chạy Offline: ${error.message}</span>`;
             totalDeltaEl.style.display = "none";
-        } else if (dbSnapshotResults) {
-            snapshotData = dbSnapshotResults.val() || {};
         }
 
         let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0, tUsdDelta = 0;
         let rowsHtml = "";
 
-        for (let item of walletsData) {
-            const { wallet, ron, axs, slp, weth } = item;
+        for (let w of WALLETS) {
+            const ronHex = await call("eth_getBalance", [w.address, "latest"]);
+            const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
+            const axs = await getBal(ADDRS.AXS, w.address);
+            const slp = await getBal(ADDRS.SLP, w.address);
+            const weth = await getBal(ADDRS.WETH, w.address);
 
             const val = (ron * (p.ronin?.usd || 0)) + 
                         (axs * (p['axie-infinity']?.usd || 0)) + 
                         (slp * (p['smooth-love-potion']?.usd || 0)) + 
                         (weth * (p.weth?.usd || 0));
 
-            if (isFirebaseOk && snapshotData[wallet.address] === undefined) {
+            if (isFirebaseOk && snapshotData[w.address] === undefined) {
                 try {
-                    snapshotData[wallet.address] = val;
-                    await set(child(snapshotRef, wallet.address), val);
+                    snapshotData[w.address] = val;
+                    await set(child(snapshotRef, w.address), val);
                 } catch(e) {}
             }
 
-            const oldVal = snapshotData[wallet.address] !== undefined ? snapshotData[wallet.address] : val;
+            const oldVal = snapshotData[w.address] !== undefined ? snapshotData[w.address] : val;
             const delta = val - oldVal;
             const deltaClass = delta >= 0 ? "style='color:green'" : "style='color:red'";
             const deltaText = delta >= 0 ? `+${delta.toFixed(2)}` : `${delta.toFixed(2)}`;
 
             tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val; 
-            tUsdDelta += delta;
+            tUsdDelta += delta; // Cộng dồn chênh lệch để tính Tổng Biến Động
 
             rowsHtml += `<tr>
-                <td><strong>${wallet.name}</strong></td>
+                <td><strong>${w.name}</strong></td>
                 <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
                 <td class="usd-highlight">$${val.toFixed(2)}</td>
                 <td class="delta" ${deltaClass}>${isFirebaseOk ? deltaText : 'N/A'}</td>
             </tr>`;
         }
 
-        document.getElementById('tbody').innerHTML = rowsHtml; 
+        tbody.innerHTML = rowsHtml; 
 
         document.getElementById('tot-ron').innerText = tRon.toFixed(2);
         document.getElementById('tot-axs').innerText = tAxs.toFixed(2);
         document.getElementById('tot-slp').innerText = tSlp.toFixed(2);
         document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
         document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
-
+        
+        // Cập nhật giao diện Tổng Biến Động (Chỉ khi Firebase hoạt động)
         if (isFirebaseOk) {
             msgEl.innerText = "Đã đồng bộ thành công. Mốc so sánh Thứ 4 (" + wedDate + ")";
             totalDeltaEl.style.display = "inline-block";
@@ -385,12 +336,12 @@
                 totalDeltaEl.innerText = `▲ +$${tUsdDelta.toFixed(2)}`;
                 totalDeltaEl.className = "delta-up";
             } else {
+                // Dùng Math.abs để loại bỏ dấu trừ trong chuỗi, ví dụ thành ▼ -$50 thay vì ▼ $-50
                 totalDeltaEl.innerText = `▼ -$${Math.abs(tUsdDelta).toFixed(2)}`;
                 totalDeltaEl.className = "delta-down";
             }
         }
 
-        btnEl.disabled = false;
         isScanning = false;
     }
 
