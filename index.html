@@ -3,390 +3,432 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ronin Wallet Dashboard</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- FontAwesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <title>Dashboard Ví Ronin - Firebase Sync</title>
+    <style>
+        :root { --primary-color: #1273e6; --bg-color: #f4f6f9; --card-bg: #ffffff; --text-color: #212529; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: #0c356a; margin-bottom: 20px; }
+        .refresh-area { text-align: center; margin-bottom: 25px; }
+        .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
+        .btn-refresh:hover { background-color: #0f5bb8; }
+        .btn-refresh:disabled { background-color: #a0c4ff; cursor: not-allowed; }
+        
+        .summary-dashboard { 
+            background: linear-gradient(135deg, #0f4c81, #1d70b8); 
+            color: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            margin-bottom: 30px; 
+            display: grid; 
+            grid-template-columns: repeat(5, 1fr); 
+            gap: 15px; 
+        }
+        .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; position: relative; }
+        .token-box .name { font-size: 13px; opacity: 0.8; }
+        .token-box .amount { font-size: 18px; font-weight: bold; margin-top: 5px; }
+        
+        #tot-usd-delta { font-size: 13px; font-weight: bold; margin-top: 8px; display: inline-block; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.15); }
+        .delta-up { color: #4ade80; } 
+        .delta-down { color: #f87171; } 
+
+        .details-section { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th { background: #f8f9fa; padding: 12px; border-bottom: 2px solid #dee2e6; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #dee2e6; }
+        .usd-highlight { color: #28a745; font-weight: bold; }
+        .delta { font-size: 0.9em; font-weight: bold; }
+
+        #login-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: var(--bg-color);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 9999;
+        }
+        .login-card {
+            background: var(--card-bg); padding: 30px; border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; max-width: 360px; width: 90%;
+        }
+        .login-card h2 { margin-top: 0; color: #0c356a; font-size: 20px; }
+        .login-card input {
+            width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ccc;
+            border-radius: 6px; box-sizing: border-box; font-size: 16px; outline: none;
+        }
+        .login-card input:focus { border-color: var(--primary-color); }
+        .login-card button {
+            width: 100%; background: var(--primary-color); color: white; border: none;
+            padding: 12px; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer;
+        }
+        .login-card button:hover { opacity: 0.9; }
+        #login-error { color: #dc3545; font-size: 13px; margin-top: 10px; display: none; }
+        
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .header-bar h1 { margin: 0; }
+        .btn-logout { background-color: #dc3545; color: white; border: none; padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .btn-logout:hover { opacity: 0.85; }
+
+        /* Reponsive cho Mobile */
+        @media (max-width: 768px) {
+            .summary-dashboard { grid-template-columns: repeat(2, 1fr); }
+            .header-bar h1 { font-size: 18px; }
+        }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+<body>
 
-    <!-- MÀN HÌNH ĐĂNG NHẬP -->
-    <div id="loginScreen" class="fixed inset-0 bg-slate-950 flex items-center justify-center z-50 p-4">
-        <div class="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 w-full max-w-md">
-            <div class="text-center mb-6">
-                <i class="fa-solid fa-wallet text-indigo-500 text-5xl mb-3"></i>
-                <h2 class="text-2xl font-bold">Ronin Dashboard</h2>
-                <p class="text-slate-400 text-sm mt-1">Nhập mật khẩu để truy cập hệ thống</p>
-            </div>
-            <form id="loginForm" onsubmit="handleLogin(event)">
-                <div class="mb-4">
-                    <input type="password" id="passwordInput" placeholder="Mật khẩu..." 
-                        class="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl focus:outline-none focus:border-indigo-500 text-white placeholder-slate-500">
-                </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold py-3 rounded-xl transition duration-200">
-                    Mở Khóa
-                </button>
-                <p id="loginError" class="text-red-400 text-sm mt-3 text-center hidden">Mật khẩu không chính xác!</p>
-            </form>
+<!-- MÀN HÌNH ĐĂNG NHẬP -->
+<div id="login-screen">
+    <div class="login-card">
+        <h2>🔐 Xác Thực Truy Cập</h2>
+        <p style="font-size: 13px; color: #666; margin-bottom: 0;">Vui lòng nhập mật khẩu để vào Dashboard</p>
+        <input type="password" id="password-input" placeholder="Mật khẩu của bạn..." />
+        <button id="btn-login">Đăng Nhập</button>
+        <p id="login-error"></p>
+    </div>
+</div>
+
+<!-- CONTAINER DASHBOARD -->
+<div class="container" id="main-dashboard" style="display: none;">
+    <div class="header-bar">
+        <h1>Hệ Thống Quản Lý Ví Ronin</h1>
+        <button class="btn-logout" id="btn-logout">🚪 Đăng xuất</button>
+    </div>
+
+    <div class="refresh-area">
+        <button class="btn-refresh" id="btn-refresh">🔄 Tải Lại & So Sánh Firebase</button>
+        <p id="msg" style="color: #666; font-size: 14px; margin-top:10px;"></p>
+    </div>
+
+    <div class="summary-dashboard">
+        <div class="token-box"><div class="name">Tổng RON</div><div id="tot-ron" class="amount">0</div></div>
+        <div class="token-box"><div class="name">Tổng AXS</div><div id="tot-axs" class="amount">0</div></div>
+        <div class="token-box"><div class="name">Tổng SLP</div><div id="tot-slp" class="amount">0</div></div>
+        <div class="token-box"><div class="name">Tổng WETH</div><div id="tot-weth" class="amount">0</div></div>
+        <div class="token-box" style="border-left: 4px solid #28a745;">
+            <div class="name">Tổng USD</div>
+            <div id="tot-usd" class="amount">$ 0</div>
+            <div id="tot-usd-delta"></div>
         </div>
     </div>
 
-    <!-- MÀN HÌNH CHÍNH (DASHBOARD) -->
-    <div id="dashboard" class="hidden container mx-auto px-4 py-8 max-w-6xl">
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 bg-slate-800/50 p-6 rounded-2xl border border-slate-800">
-            <div>
-                <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-                    <i class="fa-solid fa-[#1273ea] fa-shield-halved text-indigo-400"></i> Quản Lý Ví Ronin
-                </h1>
-                <p class="text-slate-400 text-sm mt-1">Theo dõi số dư và biến động tài sản theo thời gian thực</p>
-            </div>
-            <div class="flex items-center gap-3">
-                <button onclick="fetchData()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-medium flex items-center gap-2 transition shadow-lg shadow-indigo-600/20">
-                    <i class="fa-solid fa-rotate-right" id="refreshIcon"></i> Cập Nhật Dữ Liệu
-                </button>
-            </div>
-        </div>
-
-        <!-- Thẻ Tổng Quan -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-lg">
-                <p class="text-slate-400 text-sm font-medium mb-1">Tổng Tài Sản (USD)</p>
-                <h2 id="totalUsd" class="text-3xl font-black text-emerald-400">$0.00</h2>
-                <span class="text-xs text-slate-500 mt-2 block">Quy đổi từ RON, AXS, SLP, WETH</span>
-            </div>
-
-            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-lg">
-                <p class="text-slate-400 text-sm font-medium mb-1">So Với Mốc Thứ 4 Tuần Trước</p>
-                <div class="flex items-baseline gap-3">
-                    <h2 id="snapshotDiff" class="text-3xl font-black text-slate-300">$0.00</h2>
-                    <span id="snapshotPercent" class="text-sm font-bold px-2 py-0.5 rounded">0.00%</span>
-                </div>
-                <span id="snapshotDate" class="text-xs text-slate-500 mt-2 block">Mốc so sánh: Chưa có dữ liệu</span>
-            </div>
-
-            <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700/60 shadow-lg">
-                <p class="text-slate-400 text-sm font-medium mb-1">Trạng Thái Giá Thị Trường</p>
-                <div id="priceSource" class="text-sm font-semibold text-indigo-400 mt-2">Đang tải giá...</div>
-                <div class="text-xs text-slate-400 mt-3 grid grid-cols-2 gap-1" id="priceList">
-                    <!-- Giá lẻ từng đồng -->
-                </div>
-            </div>
-        </div>
-
-        <!-- Bảng Số Dư Chi Tiết -->
-        <div class="bg-slate-800 rounded-2xl border border-slate-700/60 shadow-lg overflow-hidden mb-8">
-            <div class="p-6 border-b border-slate-700/60">
-                <h3 class="text-xl font-bold">Chi Tiết Số Dư Token</h3>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider border-b border-slate-700/60">
-                            <th class="py-4 px-6">Token</th>
-                            <th class="py-4 px-6">Số Lượng</th>
-                            <th class="py-4 px-6">Giá (USD)</th>
-                            <th class="py-4 px-6 text-right">Tổng Quy Đổi (USD)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tokenTable" class="divide-y divide-slate-700/40 text-sm font-medium">
-                        <!-- Render từ Javascript -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="details-section">
+        <table>
+            <thead><tr><th>Tên Ví</th><th>Chi Tiết Số Dư</th><th>Giá Trị</th><th>So với T4</th></tr></thead>
+            <tbody id="tbody"></tbody>
+        </table>
     </div>
+</div>
 
-    <script>
-        // --- CẤU HÌNH FIREBASE ---
-        const firebaseConfig = {
-            databaseURL: "https://YOUR_FIREBASE_DATABASE_URL.firebaseio.com" // Thay URL Firebase của bạn vào đây
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, get, set, child } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-        // --- CẤU HÌNH ĐỊA CHỈ VÍ & CONTRACTS ---
-        const WALLET_ADDRESS = "0xYourWalletAddressHere"; // Thay địa chỉ ví Ronin của bạn vào đây (dạng 0x...)
-        const RONIN_RPC = "https://api.roninchain.com/rpc";
+    // --- CẤU HÌNH VÍ CỦA BẠN ---
+    const WALLETS = [
+        { name: "Cody", address: "0xB560DE556Cf8724aa479121139B8e7EE1Dc8447F" },
+        { name: "Crystie", address: "0x5B842258fC785E3C8b5d17a150FB8a9Fdce26593" },
+        { name: "James1", address: "0xa22aaf1077fc31980fb3b1900c2a27318efd6c28" },
+        { name: "Kuro", address: "0x20d9cb64a6c5cf875897a54cf171df930d612abb" },
+        { name: "Loki", address: "0xd985f56b366d1ea58a240b06c34a97919af168f5" },
+        { name: "Momo", address: "0xB512f72D97a826AbB80c2258De350A9a37256BB7" },
+        { name: "Omi", address: "0x837b6e39f119c438e61316782100b269e4b4f3a0" },
+        { name: "Pokemon", address: "0xcee118fb6b827a5ce2eb61cca321e516fdccafdb" },
+        { name: "Randy", address: "0x7ca6b3a5d9ec0ba2ba00298aa67b768d9bbf7e01" },
+        { name: "Shiro", address: "0x641146919c8c720cc9f556cbb4f7f5e9d3e2dd73" },
+        { name: "Nezuko", address: "0x3E57FcF62E7655770cA45bc3Aabf5344d9560c65" },
+    ];
 
-        const CONTRACTS = {
-            AXS: "0x97a9107c1793bc407d6f527b77e7fff4d812bece",
-            SLP: "0xa8751a144122d16b3ab300e84bc9123c52a0a2df",
-            WETH: "0xc99a6a98d4571e418e20795430030588147d346b"
-        };
+    // --- CẤU HÌNH FIREBASE CỦA BẠN ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCNjLE_yB23EskB006CkJwaAiUsv56Dsbg",
+        authDomain: "axiewm.firebaseapp.com",
+        databaseURL: "https://axiewm-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "axiewm",
+        storageBucket: "axiewm.firebasestorage.app",
+        messagingSenderId: "952539590502",
+        appId: "1:952539590502:web:a53b0027a1a0fc0a6162a7",
+        measurementId: "G-FMDXXJ6XTZ"
+    };
 
-        // --- GIÁ MẶC ĐỊNH DỰ PHÒNG (NẾU API LỖI) ---
-        const DEFAULT_PRICES = {
-            ron: 1.50,
-            axs: 5.20,
-            slp: 0.003,
-            weth: 3200.00
-        };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-        let currentPrices = { ...DEFAULT_PRICES };
+    const RPC = "https://api.roninchain.com/rpc";
+    const ADDRS = {
+        AXS: "0x97a9107c1793bc407d6f527b77e7fff4d812bece",
+        SLP: "0xa8754b9fa15fc18bb59458815510e40a12cd2014",
+        WETH: "0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5"
+    };
 
-        // --- XÁC THỰC ĐĂNG NHẬP ---
-        async function handleLogin(e) {
-            e.preventDefault();
-            const inputPass = document.getElementById('passwordInput').value;
+    let isScanning = false; 
+
+    // --- XỬ LÝ ĐĂNG NHẬP & ĐĂNG XUẤT ---
+    const loginScreen = document.getElementById('login-screen');
+    const mainDashboard = document.getElementById('main-dashboard');
+    const passwordInput = document.getElementById('password-input');
+    const btnLogin = document.getElementById('btn-login');
+    const btnLogout = document.getElementById('btn-logout');
+    const loginError = document.getElementById('login-error');
+
+    async function handleLogin() {
+        const inputPass = passwordInput.value.trim();
+        if (!inputPass) {
+            showError("Vui lòng nhập mật khẩu!");
+            return;
+        }
+
+        btnLogin.disabled = true;
+        btnLogin.innerText = "⏳ Đang kiểm tra...";
+        loginError.style.display = "none";
+
+        try {
+            const passwordRef = ref(db, 'password');
+            const snapshot = await get(passwordRef);
+
+            if (!snapshot.exists()) {
+                showError("Chưa cài mật khẩu ở node 'password' trên Firebase!");
+                btnLogin.disabled = false;
+                btnLogin.innerText = "Đăng Nhập";
+                return;
+            }
+
+            const dbPassword = String(snapshot.val());
+
+            if (inputPass === dbPassword) {
+                sessionStorage.setItem('is_authenticated', 'true');
+                unlockDashboard();
+            } else {
+                showError("Mật khẩu không chính xác!");
+                btnLogin.disabled = false;
+                btnLogin.innerText = "Đăng Nhập";
+            }
+        } catch (err) {
+            showError("Lỗi kết nối Firebase: " + err.message);
+            btnLogin.disabled = false;
+            btnLogin.innerText = "Đăng Nhập";
+        }
+    }
+
+    function showError(msg) {
+        loginError.innerText = msg;
+        loginError.style.display = "block";
+    }
+
+    function unlockDashboard() {
+        loginScreen.style.display = "none";
+        mainDashboard.style.display = "block";
+        main();
+    }
+
+    function handleLogout() {
+        sessionStorage.removeItem('is_authenticated');
+        mainDashboard.style.display = "none";
+        loginScreen.style.display = "flex";
+        passwordInput.value = "";
+        btnLogin.disabled = false;
+        btnLogin.innerText = "Đăng Nhập";
+    }
+
+    if (sessionStorage.getItem('is_authenticated') === 'true') {
+        unlockDashboard();
+    }
+
+    btnLogin.addEventListener('click', handleLogin);
+    btnLogout.addEventListener('click', handleLogout);
+    passwordInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleLogin();
+    });
+
+    // Lấy ngày Thứ 4 gần nhất theo múi giờ địa phương
+    function getWedDate() {
+        const d = new Date();
+        const day = d.getDay();
+        const diff = (day >= 3) ? (day - 3) : (day + 7 - 3);
+        d.setDate(d.getDate() - diff);
+        
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const date = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${date}`;
+    }
+
+    // --- LẤY GIÁ ĐA TẦNG (ƯU TIÊN COINGECKO -> BINANCE -> GIÁ MẶC ĐỊNH) ---
+    async function getPrices() {
+        const prices = { ronin: 0, axs: 0, slp: 0, weth: 0 };
+        
+        // 1. Thử CoinGecko
+        try {
+            const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
+            if (res.ok) {
+                const data = await res.json();
+                if (data.ronin?.usd) {
+                    prices.ronin = data.ronin.usd;
+                    prices.axs = data['axie-infinity']?.usd || 0;
+                    prices.slp = data['smooth-love-potion']?.usd || 0;
+                    prices.weth = data.weth?.usd || 0;
+                    console.log("Lấy giá thành công từ CoinGecko", prices);
+                    return prices;
+                }
+            }
+        } catch(e) {
+            console.warn("CoinGecko lỗi, chuyển sang Binance...");
+        }
+
+        // 2. Dự phòng Binance
+        try {
+            const symbols = encodeURIComponent(JSON.stringify(["RONUSDT","AXSUSDT","SLPUSDT","ETHUSDT"]));
+            const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        if (item.symbol === "RONUSDT") prices.ronin = parseFloat(item.price);
+                        if (item.symbol === "AXSUSDT") prices.axs = parseFloat(item.price);
+                        if (item.symbol === "SLPUSDT") prices.slp = parseFloat(item.price);
+                        if (item.symbol === "ETHUSDT") prices.weth = parseFloat(item.price);
+                    });
+                    console.log("Lấy giá thành công từ Binance", prices);
+                    return prices;
+                }
+            }
+        } catch(err) {
+            console.warn("Binance lỗi, chuyển sang giá dự phòng...");
+        }
+
+        // 3. Giá dự phòng nếu API bị chặn
+        if (prices.ronin === 0) prices.ronin = 1.5;
+        if (prices.axs === 0) prices.axs = 4.5;
+        if (prices.slp === 0) prices.slp = 0.003;
+        if (prices.weth === 0) prices.weth = 2500;
+
+        return prices;
+    }
+
+    // --- HÀM TRUY VẤN RPC RONIN ---
+    async function call(m, p) {
+        try {
+            const r = await fetch(RPC, {
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: m, params: p })
+            });
+            const d = await r.json();
+            return d.result;
+        } catch(e) { return null; }
+    }
+
+    async function getBal(t, u) {
+        const d = "0x70a08231" + u.slice(2).padStart(64, '0');
+        const h = await call("eth_call", [{ to: t, data: d }, "latest"]);
+        return (!h || h === "0x") ? 0 : Number(BigInt(h)) / 1e18;
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function main() {
+        if (isScanning) return; 
+        isScanning = true;
+
+        const btnRefresh = document.getElementById('btn-refresh');
+        btnRefresh.disabled = true;
+
+        const msgEl = document.getElementById('msg');
+        const totalDeltaEl = document.getElementById('tot-usd-delta');
+        msgEl.innerText = "⏳ Đang cập nhật giá & quét dữ liệu...";
+        totalDeltaEl.innerText = "⏳...";
+        totalDeltaEl.className = "";
+        
+        const p = await getPrices();
+        const tbody = document.getElementById('tbody');
+        tbody.innerHTML = ""; 
+        
+        const wedDate = getWedDate();
+        const snapshotRef = ref(db, 'snapshots/' + wedDate);
+        
+        let snapshotData = {};
+        let isFirebaseOk = false;
+
+        try {
+            if (firebaseConfig.apiKey.includes("AIzaSy...")) throw new Error("Chưa có API Key thật.");
+            const dbSnapshot = await get(snapshotRef);
+            snapshotData = dbSnapshot.val() || {};
+            isFirebaseOk = true;
+        } catch (error) {
+            msgEl.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ Chạy Offline: ${error.message}</span>`;
+            totalDeltaEl.style.display = "none";
+        }
+
+        let tRon=0, tAxs=0, tSlp=0, tWeth=0, tUsd=0, tUsdDelta = 0;
+        let rowsHtml = "";
+
+        for (let i = 0; i < WALLETS.length; i++) {
+            const w = WALLETS[i];
             
-            try {
-                const snapshot = await db.ref('password').once('value');
-                const dbPassword = snapshot.val() || "123456"; // Mặc định nếu db trống
-
-                if (inputPass === dbPassword) {
-                    document.getElementById('loginScreen').classList.add('hidden');
-                    document.getElementById('dashboard').classList.remove('hidden');
-                    fetchData();
-                } else {
-                    document.getElementById('loginError').classList.remove('hidden');
-                }
-            } catch (err) {
-                // Nếu không kết nối được DB, dùng mật khẩu tĩnh dự phòng
-                if (inputPass === "123456") {
-                    document.getElementById('loginScreen').classList.add('hidden');
-                    document.getElementById('dashboard').classList.remove('hidden');
-                    fetchData();
-                } else {
-                    document.getElementById('loginError').classList.remove('hidden');
-                }
-            }
-        }
-
-        // --- HÀM LẤY GIÁ TOKEN (COINGECKO -> BINANCE -> DEFAULT) ---
-        async function fetchPrices() {
-            const priceSourceEl = document.getElementById('priceSource');
-            
-            // 1. Thử CoinGecko API
-            try {
-                const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,ethereum,weth&vs_currencies=usd");
-                if (res.ok) {
-                    const data = await res.json();
-                    currentPrices = {
-                        ron: data.ronin?.usd || DEFAULT_PRICES.ron,
-                        axs: data['axie-infinity']?.usd || DEFAULT_PRICES.axs,
-                        slp: data['smooth-love-potion']?.usd || DEFAULT_PRICES.slp,
-                        weth: data.ethereum?.usd || data.weth?.usd || DEFAULT_PRICES.weth
-                    };
-                    priceSourceEl.textContent = "Nguồn giá: CoinGecko (Thời gian thực)";
-                    renderPriceList();
-                    return currentPrices;
-                }
-            } catch (e) {
-                console.warn("CoinGecko error, trying Binance fallback...", e);
-            }
-
-            // 2. Dự phòng: Binance API (Đã sửa lại mã Ticker chuẩn)
-            try {
-                const symbols = JSON.stringify(["RONINUSDT", "AXSUSDT", "SLPUSDT", "ETHUSDT"]);
-                const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    const priceMap = {};
-                    data.forEach(item => { priceMap[item.symbol] = parseFloat(item.price); });
-
-                    currentPrices = {
-                        ron: priceMap["RONINUSDT"] || DEFAULT_PRICES.ron,
-                        axs: priceMap["AXSUSDT"] || DEFAULT_PRICES.axs,
-                        slp: priceMap["SLPUSDT"] || DEFAULT_PRICES.slp,
-                        weth: priceMap["ETHUSDT"] || DEFAULT_PRICES.weth
-                    };
-                    priceSourceEl.textContent = "Nguồn giá: Binance API (Fallback)";
-                    renderPriceList();
-                    return currentPrices;
-                }
-            } catch (e) {
-                console.warn("Binance error, using default prices...", e);
-            }
-
-            // 3. Dự phòng cuối cùng: Giá mặc định
-            currentPrices = { ...DEFAULT_PRICES };
-            priceSourceEl.textContent = "Nguồn giá: Mặc Định (Cố định)";
-            renderPriceList();
-            return currentPrices;
-        }
-
-        function renderPriceList() {
-            document.getElementById('priceList').innerHTML = `
-                <div>RON: <b class="text-white">$${currentPrices.ron.toFixed(2)}</b></div>
-                <div>AXS: <b class="text-white">$${currentPrices.axs.toFixed(2)}</b></div>
-                <div>SLP: <b class="text-white">$${currentPrices.slp.toFixed(4)}</b></div>
-                <div>WETH: <b class="text-white">$${currentPrices.weth.toFixed(2)}</b></div>
-            `;
-        }
-
-        // --- HÀM GỌI RPC RONIN VÀ TÍNH TỔNG SỐ DƯ ---
-        async function fetchBalances() {
-            const cleanAddress = WALLET_ADDRESS.toLowerCase().replace('ronin:', '0x');
-            const formattedAddr = cleanAddress.replace('0x', '').padStart(64, '0');
-            const balanceOfData = '0x70a08231' + formattedAddr;
-
-            const makeRpcCall = async (method, params) => {
-                const res = await fetch(RONIN_RPC, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        jsonrpc: '2.0',
-                        id: 1,
-                        method: method,
-                        params: params
-                    })
-                });
-                const json = await res.json();
-                return json.result || '0x0';
-            };
-
-            try {
-                // Gọi song song các dữ liệu số dư
-                const [ronHex, axsHex, slpHex, wethHex] = await Promise.all([
-                    makeRpcCall('eth_getBalance', [cleanAddress, 'latest']),
-                    makeRpcCall('eth_call', [{ to: CONTRACTS.AXS, data: balanceOfData }, 'latest']),
-                    makeRpcCall('eth_call', [{ to: CONTRACTS.SLP, data: balanceOfData }, 'latest']),
-                    makeRpcCall('eth_call', [{ to: CONTRACTS.WETH, data: balanceOfData }, 'latest'])
-                ]);
-
-                // Xử lý Decimals chính xác từng Token
-                const balances = {
-                    ron: Number(BigInt(ronHex)) / 1e18,
-                    axs: Number(BigInt(axsHex)) / 1e18,
-                    slp: Number(BigInt(slpHex)), // SLP trên Ronin có 0 decimal
-                    weth: Number(BigInt(wethHex)) / 1e18
-                };
-
-                return balances;
-            } catch (err) {
-                console.error("Lỗi đọc số dư từ Ronin RPC:", err);
-                return { ron: 0, axs: 0, slp: 0, weth: 0 };
-            }
-        }
-
-        // --- HIỂN THỊ DỮ LIỆU LÊN BẢNG VÀ TÍNH TOÁN USD ---
-        async function fetchData() {
-            const refreshIcon = document.getElementById('refreshIcon');
-            refreshIcon.classList.add('fa-spin');
-
-            const [prices, balances] = await Promise.all([
-                fetchPrices(),
-                fetchBalances()
+            // Tối ưu: Lấy đồng thời 4 số dư cùng lúc để tăng tốc độ
+            const [ronHex, axs, slp, weth] = await Promise.all([
+                call("eth_getBalance", [w.address, "latest"]),
+                getBal(ADDRS.AXS, w.address),
+                getBal(ADDRS.SLP, w.address),
+                getBal(ADDRS.WETH, w.address)
             ]);
 
-            // TÍNH TOÁN CHÍNH XÁC GIÁ TRỊ USD CHO TỪNG đồng
-            const ronUsd = balances.ron * prices.ron;
-            const axsUsd = balances.axs * prices.axs;
-            const slpUsd = balances.slp * prices.slp;
-            const wethUsd = balances.weth * prices.weth; // Chuẩn xác: 0.0009 WETH * $3200 = ~$2.88 USD
+            const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
 
-            const totalUsd = ronUsd + axsUsd + slpUsd + wethUsd;
+            const val = (ron * p.ronin) + 
+                        (axs * p.axs) + 
+                        (slp * p.slp) + 
+                        (weth * p.weth);
 
-            // Render bảng chi tiết
-            const tableBody = document.getElementById('tokenTable');
-            tableBody.innerHTML = `
-                <tr class="hover:bg-slate-700/30 transition">
-                    <td class="py-4 px-6 flex items-center gap-3 font-semibold">
-                        <span class="w-8 h-8 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">R</span> RON
-                    </td>
-                    <td class="py-4 px-6">${balances.ron.toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
-                    <td class="py-4 px-6 text-slate-400">$${prices.ron.toFixed(2)}</td>
-                    <td class="py-4 px-6 text-right font-bold text-slate-100">$${ronUsd.toFixed(2)}</td>
-                </tr>
-                <tr class="hover:bg-slate-700/30 transition">
-                    <td class="py-4 px-6 flex items-center gap-3 font-semibold">
-                        <span class="w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">A</span> AXS
-                    </td>
-                    <td class="py-4 px-6">${balances.axs.toLocaleString('en-US', { maximumFractionDigits: 4 })}</td>
-                    <td class="py-4 px-6 text-slate-400">$${prices.axs.toFixed(2)}</td>
-                    <td class="py-4 px-6 text-right font-bold text-slate-100">$${axsUsd.toFixed(2)}</td>
-                </tr>
-                <tr class="hover:bg-slate-700/30 transition">
-                    <td class="py-4 px-6 flex items-center gap-3 font-semibold">
-                        <span class="w-8 h-8 rounded-full bg-pink-500/20 text-pink-400 flex items-center justify-center font-bold">S</span> SLP
-                    </td>
-                    <td class="py-4 px-6">${balances.slp.toLocaleString('en-US')}</td>
-                    <td class="py-4 px-6 text-slate-400">$${prices.slp.toFixed(4)}</td>
-                    <td class="py-4 px-6 text-right font-bold text-slate-100">$${slpUsd.toFixed(2)}</td>
-                </tr>
-                <tr class="hover:bg-slate-700/30 transition">
-                    <td class="py-4 px-6 flex items-center gap-3 font-semibold">
-                        <span class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">W</span> WETH
-                    </td>
-                    <td class="py-4 px-6">${balances.weth.toFixed(6)}</td>
-                    <td class="py-4 px-6 text-slate-400">$${prices.weth.toFixed(2)}</td>
-                    <td class="py-4 px-6 text-right font-bold text-slate-100">$${wethUsd.toFixed(2)}</td>
-                </tr>
-            `;
+            if (isFirebaseOk && snapshotData[w.address] === undefined) {
+                try {
+                    snapshotData[w.address] = val;
+                    await set(child(snapshotRef, w.address), val);
+                } catch(e) {}
+            }
 
-            // Cập nhật tổng USD
-            document.getElementById('totalUsd').textContent = `$${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const oldVal = snapshotData[w.address] !== undefined ? snapshotData[w.address] : val;
+            const delta = val - oldVal;
+            const deltaClass = delta >= 0 ? "style='color:green'" : "style='color:red'";
+            const deltaText = delta >= 0 ? `+${delta.toFixed(2)}` : `${delta.toFixed(2)}`;
 
-            // Xử lý Snapshot so sánh tuần (Thứ 4)
-            await handleSnapshotComparison(totalUsd);
+            tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val; 
+            tUsdDelta += delta;
 
-            refreshIcon.classList.remove('fa-spin');
+            rowsHtml += `<tr>
+                <td><strong>${w.name}</strong></td>
+                <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
+                <td class="usd-highlight">$${val.toFixed(2)}</td>
+                <td class="delta" ${deltaClass}>${isFirebaseOk ? deltaText : 'N/A'}</td>
+            </tr>`;
+
+            await sleep(50);
         }
 
-        // --- QUẢN LÝ SNAPSHOT THỨ 4 TỰ ĐỘNG ---
-        async function handleSnapshotComparison(currentTotal) {
-            const today = new Date();
-            const isWednesday = today.getDay() === 3; // 3 = Thứ 4
+        tbody.innerHTML = rowsHtml; 
 
-            // Lấy ngày Thứ 4 gần nhất làm Key (dạng YYYY-MM-DD)
-            const lastWednesday = new Date(today);
-            const diffToWed = (today.getDay() + 7 - 3) % 7;
-            lastWednesday.setDate(today.getDate() - diffToWed);
-            const wedKey = lastWednesday.toISOString().split('T')[0];
-
-            try {
-                // Tự động lưu giá trị nếu hôm nay là Thứ 4
-                if (isWednesday) {
-                    await db.ref(`snapshots/${wedKey}`).set(currentTotal);
-                }
-
-                // Đọc tất cả snapshot để so sánh với mốc tuần trước
-                const snapshotRef = await db.ref('snapshots').once('value');
-                const snapshots = snapshotRef.val() || {};
-
-                const keys = Object.keys(snapshots).sort();
-                let prevValue = null;
-                let prevDate = null;
-
-                // Lấy mốc snapshot gần nhất nhưng không phải mốc của hôm nay (nếu hôm nay là T4)
-                for (let i = keys.length - 1; i >= 0; i--) {
-                    if (keys[i] !== wedKey || keys.length === 1) {
-                        prevValue = snapshots[keys[i]];
-                        prevDate = keys[i];
-                        break;
-                    }
-                }
-
-                const diffEl = document.getElementById('snapshotDiff');
-                const percentEl = document.getElementById('snapshotPercent');
-                const dateEl = document.getElementById('snapshotDate');
-
-                if (prevValue !== null && prevValue > 0) {
-                    const diff = currentTotal - prevValue;
-                    const percent = (diff / prevValue) * 100;
-
-                    const isPositive = diff >= 0;
-                    diffEl.textContent = `${isPositive ? '+' : ''}$${diff.toFixed(2)}`;
-                    diffEl.className = `text-3xl font-black ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`;
-
-                    percentEl.textContent = `${isPositive ? '+' : ''}${percent.toFixed(2)}%`;
-                    percentEl.className = `text-sm font-bold px-2 py-0.5 rounded ${isPositive ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`;
-
-                    dateEl.textContent = `Mốc so sánh: Thứ 4 (${prevDate})`;
-                } else {
-                    diffEl.textContent = "$0.00";
-                    percentEl.textContent = "0.00%";
-                    dateEl.textContent = `Đã ghi nhận mốc hôm nay (${wedKey})`;
-                }
-            } catch (e) {
-                console.warn("Không thể tải dữ liệu Snapshot từ Firebase:", e);
+        document.getElementById('tot-ron').innerText = tRon.toFixed(2);
+        document.getElementById('tot-axs').innerText = tAxs.toFixed(2);
+        document.getElementById('tot-slp').innerText = tSlp.toFixed(2);
+        document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
+        document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
+        
+        if (isFirebaseOk) {
+            msgEl.innerText = "Đã đồng bộ thành công. Mốc so sánh Thứ 4 (" + wedDate + ")";
+            totalDeltaEl.style.display = "inline-block";
+            if (tUsdDelta >= 0) {
+                totalDeltaEl.innerText = `▲ +$${tUsdDelta.toFixed(2)}`;
+                totalDeltaEl.className = "delta-up";
+            } else {
+                totalDeltaEl.innerText = `▼ -$${Math.abs(tUsdDelta).toFixed(2)}`;
+                totalDeltaEl.className = "delta-down";
             }
         }
-    </script>
+
+        isScanning = false;
+        btnRefresh.disabled = false;
+    }
+
+    document.getElementById('btn-refresh').addEventListener('click', main);
+</script>
 </body>
 </html>
