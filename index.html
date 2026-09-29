@@ -10,15 +10,15 @@
         h1 { text-align: center; color: #0c356a; margin-bottom: 20px; }
         .refresh-area { text-align: center; margin-bottom: 25px; }
         .btn-refresh { background-color: var(--primary-color); color: white; border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        .btn-refresh:disabled { background-color: #a0c4ff; cursor: not-allowed; }
         .summary-dashboard { background: linear-gradient(135deg, #0f4c81, #1d70b8); color: white; padding: 25px; border-radius: 12px; margin-bottom: 30px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; }
         .token-box { background: rgba(255, 255, 255, 0.1); padding: 15px; border-radius: 8px; border-left: 4px solid #fff; position: relative; }
         .token-box .name { font-size: 13px; opacity: 0.8; }
         .token-box .amount { font-size: 18px; font-weight: bold; margin-top: 5px; }
         
-        /* CSS cho phần hiển thị tổng chênh lệch */
         #tot-usd-delta { font-size: 13px; font-weight: bold; margin-top: 8px; display: inline-block; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.15); }
-        .delta-up { color: #4ade80; } /* Xanh lá sáng cho nền tối */
-        .delta-down { color: #f87171; } /* Đỏ sáng cho nền tối */
+        .delta-up { color: #4ade80; } 
+        .delta-down { color: #f87171; } 
 
         .details-section { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         table { width: 100%; border-collapse: collapse; }
@@ -27,7 +27,6 @@
         .usd-highlight { color: #28a745; font-weight: bold; }
         .delta { font-size: 0.9em; font-weight: bold; }
 
-        /* CSS BỔ SUNG: Màn hình đăng nhập & Nút đăng xuất */
         #login-screen {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background-color: var(--bg-color);
@@ -70,7 +69,7 @@
     </div>
 </div>
 
-<!-- CONTAINER DASHBOARD (MẶC ĐỊNH ẨN) -->
+<!-- CONTAINER DASHBOARD -->
 <div class="container" id="main-dashboard" style="display: none;">
     <div class="header-bar">
         <h1>Hệ Thống Quản Lý Ví Ronin</h1>
@@ -90,7 +89,6 @@
         <div class="token-box" style="border-left: 4px solid #28a745;">
             <div class="name">Tổng USD</div>
             <div id="tot-usd" class="amount">$ 0</div>
-            <!-- Chỗ hiển thị biến động tổng -->
             <div id="tot-usd-delta"></div>
         </div>
     </div>
@@ -146,7 +144,7 @@
 
     let isScanning = false; 
 
-    // --- BỔ SUNG: XỬ LÝ ĐĂNG NHẬP & ĐĂNG XUẤT ---
+    // --- XỬ LÝ ĐĂNG NHẬP & ĐĂNG XUẤT ---
     const loginScreen = document.getElementById('login-screen');
     const mainDashboard = document.getElementById('main-dashboard');
     const passwordInput = document.getElementById('password-input');
@@ -201,7 +199,7 @@
     function unlockDashboard() {
         loginScreen.style.display = "none";
         mainDashboard.style.display = "block";
-        main(); // Gọi hàm main gốc sau khi đăng nhập thành công
+        main();
     }
 
     function handleLogout() {
@@ -223,7 +221,6 @@
         if (e.key === 'Enter') handleLogin();
     });
 
-    // --- GIỮ NGUYÊN HOÀN TOÀN TẤT CẢ HÀM LOGIC BAN ĐẦU CỦA BẠN ---
     function getWedDate() {
         const d = new Date();
         const day = d.getDay();
@@ -232,40 +229,115 @@
         return d.toISOString().split('T')[0];
     }
 
+    // --- LẤY GIÁ TỪ BINANCE (TRÁNH BỊ CHẶN RATE LIMIT) ---
     async function getPrices() {
+        const prices = { ronin: 0, axs: 0, slp: 0, weth: 0 };
         try {
-            const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
-            return await res.json();
-        } catch(e) { return {}; }
+            const res = await fetch("https://api.binance.com/api/v3/ticker/price?symbols=[\"RONUSDT\",\"AXSUSDT\",\"SLPUSDT\",\"ETHUSDT\"]");
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                data.forEach(item => {
+                    if (item.symbol === "RONUSDT") prices.ronin = parseFloat(item.price);
+                    if (item.symbol === "AXSUSDT") prices.axs = parseFloat(item.price);
+                    if (item.symbol === "SLPUSDT") prices.slp = parseFloat(item.price);
+                    if (item.symbol === "ETHUSDT") prices.weth = parseFloat(item.price);
+                });
+            }
+        } catch(e) {
+            try {
+                const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
+                const data = await res.json();
+                prices.ronin = data.ronin?.usd || 0;
+                prices.axs = data['axie-infinity']?.usd || 0;
+                prices.slp = data['smooth-love-potion']?.usd || 0;
+                prices.weth = data.weth?.usd || 0;
+            } catch(err) {
+                console.error("Lỗi lấy giá:", err);
+            }
+        }
+        return prices;
     }
 
-    async function call(m, p) {
-        try {
-            const r = await fetch(RPC, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({jsonrpc:"2.0", id:1, method:m, params:p})});
-            const d = await r.json();
-            return d.result;
-        } catch(e) { return null; }
-    }
+    // --- TỐI ƯU CỰC ĐẠI: GỌI TẤT CẢ SỐ DƯ BẰNG 1 BATCH REQUEST ĐỂ TRÁNH QUÁ TẢI NETWORK ---
+    async function fetchAllBalancesBatch(wallets) {
+        const batchPayload = [];
+        let reqId = 1;
 
-    async function getBal(t, u) {
-        const d = "0x70a08231" + u.slice(2).padStart(64, '0');
-        const h = await call("eth_call", [{to: t, data: d}, "latest"]);
-        return (!h || h === "0x") ? 0 : Number(BigInt(h)) / 1e18;
+        wallets.forEach(w => {
+            // 1. Get RON
+            batchPayload.push({
+                jsonrpc: "2.0", id: reqId++, method: "eth_getBalance", params: [w.address, "latest"]
+            });
+            // 2. Get AXS
+            batchPayload.push({
+                jsonrpc: "2.0", id: reqId++, method: "eth_call",
+                params: [{ to: ADDRS.AXS, data: "0x70a08231" + w.address.slice(2).padStart(64, '0') }, "latest"]
+            });
+            // 3. Get SLP
+            batchPayload.push({
+                jsonrpc: "2.0", id: reqId++, method: "eth_call",
+                params: [{ to: ADDRS.SLP, data: "0x70a08231" + w.address.slice(2).padStart(64, '0') }, "latest"]
+            });
+            // 4. Get WETH
+            batchPayload.push({
+                jsonrpc: "2.0", id: reqId++, method: "eth_call",
+                params: [{ to: ADDRS.WETH, data: "0x70a08231" + w.address.slice(2).padStart(64, '0') }, "latest"]
+            });
+        });
+
+        try {
+            const res = await fetch(RPC, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(batchPayload)
+            });
+            const responses = await res.json();
+            
+            // Sắp xếp phản hồi theo đúng ID
+            const resultMap = {};
+            responses.forEach(r => { resultMap[r.id] = r.result; });
+
+            const results = {};
+            let currentId = 1;
+
+            wallets.forEach(w => {
+                const parseHex = (hex) => (!hex || hex === "0x") ? 0 : Number(BigInt(hex)) / 1e18;
+
+                results[w.address] = {
+                    ron: parseHex(resultMap[currentId++]),
+                    axs: parseHex(resultMap[currentId++]),
+                    slp: parseHex(resultMap[currentId++]),
+                    weth: parseHex(resultMap[currentId++])
+                };
+            });
+
+            return results;
+        } catch (e) {
+            console.error("Lỗi Batch RPC:", e);
+            return null;
+        }
     }
 
     async function main() {
         if (isScanning) return; 
         isScanning = true;
 
+        const btnRefresh = document.getElementById('btn-refresh');
+        btnRefresh.disabled = true;
+
         const msgEl = document.getElementById('msg');
         const totalDeltaEl = document.getElementById('tot-usd-delta');
-        msgEl.innerText = "Đang kết nối dữ liệu mạng...";
+        msgEl.innerText = "⏳ Đang đồng bộ dữ liệu (chỉ dùng 1 lượt tải RPC)...";
         totalDeltaEl.innerText = "⏳...";
         totalDeltaEl.className = "";
         
-        const p = await getPrices();
+        // Gọi giá token và gọi số dư ví song song
+        const [p, allBalances] = await Promise.all([
+            getPrices(),
+            fetchAllBalancesBatch(WALLETS)
+        ]);
+
         const tbody = document.getElementById('tbody');
-        
         const wedDate = getWedDate();
         const snapshotRef = ref(db, 'snapshots/' + wedDate);
         
@@ -286,16 +358,12 @@
         let rowsHtml = "";
 
         for (let w of WALLETS) {
-            const ronHex = await call("eth_getBalance", [w.address, "latest"]);
-            const ron = ronHex ? Number(BigInt(ronHex)) / 1e18 : 0;
-            const axs = await getBal(ADDRS.AXS, w.address);
-            const slp = await getBal(ADDRS.SLP, w.address);
-            const weth = await getBal(ADDRS.WETH, w.address);
+            const bal = allBalances ? allBalances[w.address] : { ron: 0, axs: 0, slp: 0, weth: 0 };
 
-            const val = (ron * (p.ronin?.usd || 0)) + 
-                        (axs * (p['axie-infinity']?.usd || 0)) + 
-                        (slp * (p['smooth-love-potion']?.usd || 0)) + 
-                        (weth * (p.weth?.usd || 0));
+            const val = (bal.ron * p.ronin) + 
+                        (bal.axs * p.axs) + 
+                        (bal.slp * p.slp) + 
+                        (bal.weth * p.weth);
 
             if (isFirebaseOk && snapshotData[w.address] === undefined) {
                 try {
@@ -309,12 +377,12 @@
             const deltaClass = delta >= 0 ? "style='color:green'" : "style='color:red'";
             const deltaText = delta >= 0 ? `+${delta.toFixed(2)}` : `${delta.toFixed(2)}`;
 
-            tRon += ron; tAxs += axs; tSlp += slp; tWeth += weth; tUsd += val; 
-            tUsdDelta += delta; // Cộng dồn chênh lệch để tính Tổng Biến Động
+            tRon += bal.ron; tAxs += bal.axs; tSlp += bal.slp; tWeth += bal.weth; tUsd += val; 
+            tUsdDelta += delta;
 
             rowsHtml += `<tr>
                 <td><strong>${w.name}</strong></td>
-                <td>RON: ${ron.toFixed(2)} | AXS: ${axs.toFixed(2)} | SLP: ${slp.toFixed(2)} | WETH: ${weth.toFixed(4)}</td>
+                <td>RON: ${bal.ron.toFixed(2)} | AXS: ${bal.axs.toFixed(2)} | SLP: ${bal.slp.toFixed(2)} | WETH: ${bal.weth.toFixed(4)}</td>
                 <td class="usd-highlight">$${val.toFixed(2)}</td>
                 <td class="delta" ${deltaClass}>${isFirebaseOk ? deltaText : 'N/A'}</td>
             </tr>`;
@@ -328,7 +396,6 @@
         document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
         document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
         
-        // Cập nhật giao diện Tổng Biến Động (Chỉ khi Firebase hoạt động)
         if (isFirebaseOk) {
             msgEl.innerText = "Đã đồng bộ thành công. Mốc so sánh Thứ 4 (" + wedDate + ")";
             totalDeltaEl.style.display = "inline-block";
@@ -336,13 +403,13 @@
                 totalDeltaEl.innerText = `▲ +$${tUsdDelta.toFixed(2)}`;
                 totalDeltaEl.className = "delta-up";
             } else {
-                // Dùng Math.abs để loại bỏ dấu trừ trong chuỗi, ví dụ thành ▼ -$50 thay vì ▼ $-50
                 totalDeltaEl.innerText = `▼ -$${Math.abs(tUsdDelta).toFixed(2)}`;
                 totalDeltaEl.className = "delta-down";
             }
         }
 
         isScanning = false;
+        btnRefresh.disabled = false;
     }
 
     document.getElementById('btn-refresh').addEventListener('click', main);
