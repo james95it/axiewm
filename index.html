@@ -67,7 +67,6 @@
         .btn-logout { background-color: #dc3545; color: white; border: none; padding: 8px 16px; font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         .btn-logout:hover { opacity: 0.85; }
 
-        /* Reponsive cho Mobile */
         @media (max-width: 768px) {
             .summary-dashboard { grid-template-columns: repeat(2, 1fr); }
             .header-bar h1 { font-size: 18px; }
@@ -252,11 +251,50 @@
         return `${year}-${month}-${date}`;
     }
 
-    // --- LẤY GIÁ ĐA TẦNG (ƯU TIÊN COINGECKO -> BINANCE -> GIÁ MẶC ĐỊNH) ---
+    // --- LẤY GIÁ ĐA TẦNG (ƯU TIÊN CRYPTOCOMPARE -> BINANCE -> COINGECKO) ---
     async function getPrices() {
         const prices = { ronin: 0, axs: 0, slp: 0, weth: 0 };
         
-        // 1. Thử CoinGecko
+        // 1. Nguồn 1: CryptoCompare (Ổn định nhất trên Trình duyệt)
+        try {
+            const res = await fetch("https://min-api.cryptocompare.com/data/pricemulti?fsyms=RON,AXS,SLP,ETH&tsyms=USD");
+            if (res.ok) {
+                const data = await res.json();
+                if (data.RON?.USD || data.AXS?.USD) {
+                    prices.ronin = data.RON?.USD || 0;
+                    prices.axs = data.AXS?.USD || 0;
+                    prices.slp = data.SLP?.USD || 0;
+                    prices.weth = data.ETH?.USD || 0;
+                    console.log("Lấy giá thành công từ CryptoCompare", prices);
+                    return prices;
+                }
+            }
+        } catch(e) {
+            console.warn("CryptoCompare lỗi, chuyển sang Binance...");
+        }
+
+        // 2. Nguồn 2: Binance (Đã sửa ký hiệu chuẩn: RONINUSDT)
+        try {
+            const symbols = encodeURIComponent(JSON.stringify(["RONINUSDT","AXSUSDT","SLPUSDT","ETHUSDT"]));
+            const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    data.forEach(item => {
+                        if (item.symbol === "RONINUSDT") prices.ronin = parseFloat(item.price);
+                        if (item.symbol === "AXSUSDT") prices.axs = parseFloat(item.price);
+                        if (item.symbol === "SLPUSDT") prices.slp = parseFloat(item.price);
+                        if (item.symbol === "ETHUSDT") prices.weth = parseFloat(item.price);
+                    });
+                    console.log("Lấy giá thành công từ Binance", prices);
+                    return prices;
+                }
+            }
+        } catch(err) {
+            console.warn("Binance lỗi, chuyển sang CoinGecko...");
+        }
+
+        // 3. Nguồn 3: CoinGecko
         try {
             const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=ronin,axie-infinity,smooth-love-potion,weth&vs_currencies=usd");
             if (res.ok) {
@@ -271,35 +309,14 @@
                 }
             }
         } catch(e) {
-            console.warn("CoinGecko lỗi, chuyển sang Binance...");
+            console.warn("CoinGecko lỗi...");
         }
 
-        // 2. Dự phòng Binance
-        try {
-            const symbols = encodeURIComponent(JSON.stringify(["RONUSDT","AXSUSDT","SLPUSDT","ETHUSDT"]));
-            const res = await fetch(`https://api.binance.com/api/v3/ticker/price?symbols=${symbols}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    data.forEach(item => {
-                        if (item.symbol === "RONUSDT") prices.ronin = parseFloat(item.price);
-                        if (item.symbol === "AXSUSDT") prices.axs = parseFloat(item.price);
-                        if (item.symbol === "SLPUSDT") prices.slp = parseFloat(item.price);
-                        if (item.symbol === "ETHUSDT") prices.weth = parseFloat(item.price);
-                    });
-                    console.log("Lấy giá thành công từ Binance", prices);
-                    return prices;
-                }
-            }
-        } catch(err) {
-            console.warn("Binance lỗi, chuyển sang giá dự phòng...");
-        }
-
-        // 3. Giá dự phòng nếu API bị chặn
-        if (prices.ronin === 0) prices.ronin = 1.5;
-        if (prices.axs === 0) prices.axs = 4.5;
-        if (prices.slp === 0) prices.slp = 0.003;
-        if (prices.weth === 0) prices.weth = 2500;
+        // 4. Giá ước tính thực tế dự phòng nếu cả 3 API mạng đều sập
+        if (prices.ronin === 0) prices.ronin = 0.38;
+        if (prices.axs === 0) prices.axs = 2.10;
+        if (prices.slp === 0) prices.slp = 0.0022;
+        if (prices.weth === 0) prices.weth = 2300;
 
         return prices;
     }
@@ -364,7 +381,7 @@
         for (let i = 0; i < WALLETS.length; i++) {
             const w = WALLETS[i];
             
-            // Tối ưu: Lấy đồng thời 4 số dư cùng lúc để tăng tốc độ
+            // Lấy đồng thời cả 4 Token song song để tối ưu tốc độ quét
             const [ronHex, axs, slp, weth] = await Promise.all([
                 call("eth_getBalance", [w.address, "latest"]),
                 getBal(ADDRS.AXS, w.address),
