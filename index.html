@@ -20,6 +20,24 @@
         .btn-refresh:hover { background-color: #0f5bb8; }
         .btn-refresh:disabled { background-color: #a0c4ff; cursor: not-allowed; box-shadow: none; }
         
+        /* THANH TỶ GIÁ THỜI GIAN THỰC */
+        .rate-bar {
+            background: #ffffff;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            justify-content: space-around;
+            align-items: center;
+            border: 1px solid #e9ecef;
+        }
+        .rate-item { font-size: 13px; color: #495057; }
+        .rate-item strong { color: #0c356a; }
+        .rate-item .vnd-sub { color: #28a745; font-weight: 600; font-size: 12px; margin-left: 3px; }
+
         /* DASHBOARD SUMMARY RESPONSIVE */
         .summary-dashboard { 
             background: linear-gradient(135deg, #0f4c81, #1d70b8); 
@@ -35,7 +53,8 @@
         .token-box { background: rgba(255, 255, 255, 0.12); padding: 12px; border-radius: 10px; border-left: 4px solid #fff; position: relative; }
         .token-box .name { font-size: 12px; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.5px; }
         .token-box .amount { font-size: 16px; font-weight: bold; margin-top: 4px; word-break: break-all; }
-        
+        .token-box .vnd-amount { font-size: 12px; color: #a7f3d0; margin-top: 2px; font-weight: 500; }
+
         /* Ô Tổng USD tràn 2 cột trên mobile */
         .summary-dashboard .token-box:nth-child(5) {
             grid-column: span 2;
@@ -55,6 +74,7 @@
         .token-details { display: flex; flex-wrap: wrap; gap: 4px 8px; line-height: 1.4; }
         .token-badge { background: #f0f4f8; padding: 2px 6px; border-radius: 4px; font-size: 12px; white-space: nowrap; }
         .usd-highlight { color: #28a745; font-weight: bold; font-size: 14px; white-space: nowrap; }
+        .vnd-highlight { color: #16a34a; font-size: 12px; font-weight: 600; display: block; white-space: nowrap; }
         .delta { font-size: 13px; font-weight: bold; white-space: nowrap; }
 
         /* MÀN HÌNH ĐĂNG NHẬP */
@@ -117,19 +137,45 @@
         <button class="btn-logout" id="btn-logout">🚪 Đăng xuất</button>
     </div>
 
+    <!-- BẢNG HIỂN THỊ TỶ GIÁ TỔNG HỢP -->
+    <div class="rate-bar" id="rate-bar">
+        <div class="rate-item">💵 USD/VND: <strong id="rate-usdvnd">--</strong></div>
+        <div class="rate-item">🔵 RON: <strong id="rate-ron">--</strong> <span class="vnd-sub" id="rate-ron-vnd"></span></div>
+        <div class="rate-item">⚔️ AXS: <strong id="rate-axs">--</strong> <span class="vnd-sub" id="rate-axs-vnd"></span></div>
+        <div class="rate-item">🧪 SLP: <strong id="rate-slp">--</strong> <span class="vnd-sub" id="rate-slp-vnd"></span></div>
+        <div class="rate-item">💎 WETH (ETH): <strong id="rate-weth">--</strong> <span class="vnd-sub" id="rate-weth-vnd"></span></div>
+    </div>
+
     <div class="refresh-area">
         <button class="btn-refresh" id="btn-refresh">🔄 Tải Lại & So Sánh Firebase</button>
         <p id="msg" style="color: #666; font-size: 13px; margin-top:10px;"></p>
     </div>
 
     <div class="summary-dashboard">
-        <div class="token-box"><div class="name">Tổng RON</div><div id="tot-ron" class="amount">0</div></div>
-        <div class="token-box"><div class="name">Tổng AXS</div><div id="tot-axs" class="amount">0</div></div>
-        <div class="token-box"><div class="name">Tổng SLP</div><div id="tot-slp" class="amount">0</div></div>
-        <div class="token-box"><div class="name">Tổng WETH</div><div id="tot-weth" class="amount">0</div></div>
+        <div class="token-box">
+            <div class="name">Tổng RON</div>
+            <div id="tot-ron" class="amount">0</div>
+            <div id="tot-ron-vnd" class="vnd-amount">≈ 0 VNĐ</div>
+        </div>
+        <div class="token-box">
+            <div class="name">Tổng AXS</div>
+            <div id="tot-axs" class="amount">0</div>
+            <div id="tot-axs-vnd" class="vnd-amount">≈ 0 VNĐ</div>
+        </div>
+        <div class="token-box">
+            <div class="name">Tổng SLP</div>
+            <div id="tot-slp" class="amount">0</div>
+            <div id="tot-slp-vnd" class="vnd-amount">≈ 0 VNĐ</div>
+        </div>
+        <div class="token-box">
+            <div class="name">Tổng WETH</div>
+            <div id="tot-weth" class="amount">0</div>
+            <div id="tot-weth-vnd" class="vnd-amount">≈ 0 VNĐ</div>
+        </div>
         <div class="token-box" style="border-left: 4px solid #28a745;">
-            <div class="name">Tổng USD</div>
+            <div class="name">Tổng Giá Trị</div>
             <div id="tot-usd" class="amount">$ 0</div>
+            <div id="tot-vnd" class="vnd-amount" style="font-size: 14px; font-weight: bold; color: #a7f3d0;">≈ 0 VNĐ</div>
             <div id="tot-usd-delta"></div>
         </div>
     </div>
@@ -275,9 +321,31 @@
         return `${year}-${month}-${date}`;
     }
 
+    // Định dạng số VNĐ dạng hiển thị đẹp (VD: 1,500,000 VNĐ)
+    function formatVND(amount) {
+        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+    }
+
+    // --- LẤY TỶ GIÁ USD/VND ---
+    async function getUsdVndRate() {
+        try {
+            const res = await fetch("https://open.er-api.com/v6/latest/USD");
+            if (res.ok) {
+                const data = await res.json();
+                if (data.rates?.VND) return data.rates.VND;
+            }
+        } catch (e) {
+            console.warn("Không lấy được tỷ giá USD/VND động, sử dụng tỷ giá mặc định...");
+        }
+        return 25400; // Tỷ giá mặc định nếu API lỗi
+    }
+
     // --- LẤY GIÁ ĐA TẦNG (ƯU TIÊN CRYPTOCOMPARE -> BINANCE -> COINGECKO) ---
     async function getPrices() {
-        const prices = { ronin: 0, axs: 0, slp: 0, weth: 0 };
+        const prices = { ronin: 0, axs: 0, slp: 0, weth: 0, usdvnd: 25400 };
+        
+        // Lấy tỷ giá USD/VND
+        prices.usdvnd = await getUsdVndRate();
         
         // 1. Nguồn 1: CryptoCompare (Ổn định nhất trên Trình duyệt)
         try {
@@ -290,6 +358,7 @@
                     prices.slp = data.SLP?.USD || 0;
                     prices.weth = data.ETH?.USD || 0;
                     console.log("Lấy giá thành công từ CryptoCompare", prices);
+                    updateRateBar(prices);
                     return prices;
                 }
             }
@@ -311,6 +380,7 @@
                         if (item.symbol === "ETHUSDT") prices.weth = parseFloat(item.price);
                     });
                     console.log("Lấy giá thành công từ Binance", prices);
+                    updateRateBar(prices);
                     return prices;
                 }
             }
@@ -329,6 +399,7 @@
                     prices.slp = data['smooth-love-potion']?.usd || 0;
                     prices.weth = data.weth?.usd || 0;
                     console.log("Lấy giá thành công từ CoinGecko", prices);
+                    updateRateBar(prices);
                     return prices;
                 }
             }
@@ -342,7 +413,25 @@
         if (prices.slp === 0) prices.slp = 0.0022;
         if (prices.weth === 0) prices.weth = 2300;
 
+        updateRateBar(prices);
         return prices;
+    }
+
+    // Hiển thị thanh tỷ giá USD và VND lên UI
+    function updateRateBar(p) {
+        document.getElementById('rate-usdvnd').innerText = p.usdvnd.toLocaleString('vi-VN') + " VNĐ";
+        
+        document.getElementById('rate-ron').innerText = `$${p.ronin.toFixed(3)}`;
+        document.getElementById('rate-ron-vnd').innerText = `(${formatVND(p.ronin * p.usdvnd)})`;
+
+        document.getElementById('rate-axs').innerText = `$${p.axs.toFixed(2)}`;
+        document.getElementById('rate-axs-vnd').innerText = `(${formatVND(p.axs * p.usdvnd)})`;
+
+        document.getElementById('rate-slp').innerText = `$${p.slp.toFixed(4)}`;
+        document.getElementById('rate-slp-vnd').innerText = `(${formatVND(p.slp * p.usdvnd)})`;
+
+        document.getElementById('rate-weth').innerText = `$${p.weth.toFixed(2)}`;
+        document.getElementById('rate-weth-vnd').innerText = `(${formatVND(p.weth * p.usdvnd)})`;
     }
 
     // --- HÀM TRUY VẤN RPC RONIN ---
@@ -420,6 +509,8 @@
                         (slp * p.slp) + 
                         (weth * p.weth);
 
+            const valVnd = val * p.usdvnd;
+
             if (isFirebaseOk && snapshotData[w.address] === undefined) {
                 try {
                     snapshotData[w.address] = val;
@@ -445,7 +536,10 @@
                         <span class="token-badge">WETH: <strong>${weth.toFixed(4)}</strong></span>
                     </div>
                 </td>
-                <td class="usd-highlight">$${val.toFixed(2)}</td>
+                <td>
+                    <div class="usd-highlight">$${val.toFixed(2)}</div>
+                    <span class="vnd-highlight">${formatVND(valVnd)}</span>
+                </td>
                 <td class="delta" ${deltaClass}>${isFirebaseOk ? deltaText : 'N/A'}</td>
             </tr>`;
 
@@ -454,11 +548,21 @@
 
         tbody.innerHTML = rowsHtml; 
 
+        // Cập nhật số lượng và quy đổi tiền VND trên Dashboard Summary
         document.getElementById('tot-ron').innerText = tRon.toFixed(2);
+        document.getElementById('tot-ron-vnd').innerText = `≈ ${formatVND(tRon * p.ronin * p.usdvnd)}`;
+
         document.getElementById('tot-axs').innerText = tAxs.toFixed(2);
+        document.getElementById('tot-axs-vnd').innerText = `≈ ${formatVND(tAxs * p.axs * p.usdvnd)}`;
+
         document.getElementById('tot-slp').innerText = tSlp.toFixed(2);
+        document.getElementById('tot-slp-vnd').innerText = `≈ ${formatVND(tSlp * p.slp * p.usdvnd)}`;
+
         document.getElementById('tot-weth').innerText = tWeth.toFixed(4);
+        document.getElementById('tot-weth-vnd').innerText = `≈ ${formatVND(tWeth * p.weth * p.usdvnd)}`;
+
         document.getElementById('tot-usd').innerText = "$ " + tUsd.toFixed(2);
+        document.getElementById('tot-vnd').innerText = `≈ ${formatVND(tUsd * p.usdvnd)}`;
         
         if (isFirebaseOk) {
             msgEl.innerText = "Đã đồng bộ thành công. Mốc so sánh Thứ 4 (" + wedDate + ")";
